@@ -10,6 +10,7 @@
 library(shiny)
 library(shinyFiles)
 library(DT)
+library(dplyr)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -33,6 +34,7 @@ ui <- fluidPage(
                fluidRow(h4("Loaded Gene Count tables")),
                #fluidRow(DTOutput("genCntTbl")),
                fluidRow(
+                   
                    h4('Uploaded Gene Count tables'),
                    DT::dataTableOutput('genCntTabTab'),
                    verbatimTextOutput('y12')
@@ -46,13 +48,35 @@ ui <- fluidPage(
                tabsetPanel(
                    tabPanel("Quality Control", 
                             column(4),
-                            # column(3, sliderInput("bins",
-                            #                       "Number of bins:",
-                            #                       min = 1,
-                            #                       max = 50,
-                            #                       value = 30))
                             ), # Check fastq qc
-                   tabPanel("Normalization"),
+                   tabPanel("Normalization",
+                            column(1),
+                            column(11,
+                            fluidRow(
+                                actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
+                                actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
+                            
+                                
+                                ), 
+                            fluidRow(
+                                actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
+                                actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
+                                
+                                
+                            ), 
+                            fluidRow(
+                                h4('Factors (double click on table cell to fill in)'),
+                                DT::dataTableOutput('factors'),
+                                
+                                ),
+                            fluidRow(actionButton(label = "Update", inputId = "updateFactors")),
+                            fluidRow(
+                                h4('Assign Factors'),
+                                DT::dataTableOutput('assignfactors'),
+                                
+                            ),                            
+                            ),
+                   ),
                    tabPanel("Data Exploration"),
                    tabPanel("Differential Analysis"), # Check overlaps
                    tabPanel("Genelists/Sequences"),
@@ -69,10 +93,15 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
     
-    
-    
+ 
     # Reactive values ---------------------------------------------------------------------------------- # 
-    reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c())
+ 
+    reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""))
+    # analysisOb is an s4 class with slots to store analysis
+    # geneCntIn stores the temporary file location of the gene count tbale when it is loaded
+    # selectGnCnts 
+    # factorsTab is a tibble with the current factors
+    
     
     # Load/create analysis objects --------------------------------------------------------------------- # 
     # Create new analysis object to store data and results
@@ -188,9 +217,34 @@ server <- function(input, output, session) {
       #  print(input$genCntTabTab_rows_selected)
         reVals$analysisOb <- rmGeneCnts(reVals$analysisOb, as.numeric(input$genCntTabTab_rows_selected)) # remove the counts
        # print(reVals$analysisOb)
-        output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't')) # rerender table
+        #output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't')) # rerender table
     })
 
+### Normalization Tab ============================================================================================== ###
+    
+    output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = T)
+    
+    # Add new factor
+    observeEvent(input$addFactor, {
+        
+        reVals$factorsTab[nrow(reVals$factorsTab) + 1, ] <- as.list(rep("", length(reVals$factorsTab)))
+        
+    })
+    
+    # Remove selected factor
+    observeEvent(input$rmFactor, {
+        print(input$factors_rows_selected)
+        reVals$factorsTab <- reVals$factorsTab[!(1:nrow(reVals$factorsTab) %in% as.numeric(input$factors_rows_selected)), ]
+        #output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = T)
+    })
+    
+    # Add new level
+    observeEvent(input$addLevel, {
+        
+        
+        
+    })
+    
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
