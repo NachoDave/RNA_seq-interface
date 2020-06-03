@@ -11,6 +11,7 @@ library(shiny)
 library(shinyFiles)
 library(DT)
 library(dplyr)
+source("RNA_SeqSaveClass.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -37,7 +38,7 @@ ui <- fluidPage(
                    
                    h4('Uploaded Gene Count tables'),
                    DT::dataTableOutput('genCntTabTab'),
-                   verbatimTextOutput('y12')
+                   #verbatimTextOutput('y12')
                ),
                fluidRow(actionButton("removeGnCnt", "Remove Gene Count Table"))
 
@@ -53,23 +54,28 @@ ui <- fluidPage(
                             column(1),
                             column(11,
                             fluidRow(
-                                actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
-                                actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
-                            
+
+                                selectInput(label = "Choose Factors List", inputId = "selectFacTab", choices = NULL)
                                 
                                 ), 
                             fluidRow(
-                                actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
-                                actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
-                                
-                                
+                                actionButton(label = "New factors table", inputId = "newFacTab", icon = icon("plus")),
+                                actionButton(label = "Remove factors table", inputId = "rmFacTab", icon = icon("minus"))
+
                             ), 
                             fluidRow(
                                 h4('Factors (double click on table cell to fill in)'),
                                 DT::dataTableOutput('factors'),
-                                
                                 ),
-                            fluidRow(actionButton(label = "Update", inputId = "updateFactors")),
+                            fluidRow(actionButton(label = "Update", inputId = "updateFactors")
+                                     ),
+                            
+                            fluidRow(
+                                actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
+                                actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
+                                actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
+                                actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
+                                     ),
                             fluidRow(
                                 h4('Assign Factors'),
                                 DT::dataTableOutput('assignfactors'),
@@ -96,11 +102,14 @@ server <- function(input, output, session) {
  
     # Reactive values ---------------------------------------------------------------------------------- # 
  
-    reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""))
+    reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), 
+                             factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1
+                             )
     # analysisOb is an s4 class with slots to store analysis
-    # geneCntIn stores the temporary file location of the gene count tbale when it is loaded
+    # geneCntIn stores the temporary file location of the gene count table when it is loaded
     # selectGnCnts 
     # factorsTab is a tibble with the current factors
+    # curFac stores the index of the currently in use factors table stored in the analysisOb
     
     
     # Load/create analysis objects --------------------------------------------------------------------- # 
@@ -201,6 +210,7 @@ server <- function(input, output, session) {
         reVals$geneSetDes <- input$description
         
         # Write gene count table and meta data to analysisOb
+        
         reVals$analysisOb <- newGeneCnts(isolate(reVals$analysisOb), reVals$geneCntIn, data.frame(Description = reVals$geneSetDes, FileName = input$loadCntTab$name, stringsAsFactors = F))
         reVals$geneSetDes <- "" # reset the description
         reVals$geneCntIn <- NULL
@@ -209,7 +219,7 @@ server <- function(input, output, session) {
 
         # Update the gene counts table
         output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
-        output$y12 = renderPrint(input$genCntTabTab_rows_selected)
+        #output$y12 = renderPrint(input$genCntTabTab_rows_selected)
         
     })
     
@@ -222,7 +232,9 @@ server <- function(input, output, session) {
 
 ### Normalization Tab ============================================================================================== ###
     
-    output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = T)
+    ### Factor table ----------------------------------------------------------------------------------------------- ###
+    
+    output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = "cell")
     
     # Add new factor
     observeEvent(input$addFactor, {
@@ -233,18 +245,87 @@ server <- function(input, output, session) {
     
     # Remove selected factor
     observeEvent(input$rmFactor, {
-        print(input$factors_rows_selected)
+        
         reVals$factorsTab <- reVals$factorsTab[!(1:nrow(reVals$factorsTab) %in% as.numeric(input$factors_rows_selected)), ]
-        #output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = T)
+
     })
     
     # Add new level
     observeEvent(input$addLevel, {
+        #browser()
+        reVals$factorsTab[, paste("Level", as.character(ncol(reVals$factorsTab)))] <- rep("", nrow(reVals$factorsTab))
         
+    })
+    
+    # Remove level
+    observeEvent(input$rmLevel, {
+        
+        if (ncol(reVals$factorsTab) > 1){
+        reVals$factorsTab <- reVals$factorsTab[, 1:ncol(reVals$factorsTab) -1]
+        }
+    })
+    
+    # Update the local factor tbl based on the user input to the table
+    observeEvent(input$factors_cell_edit, {
+        reVals$factorsTab[input$factors_cell_edit$row, input$factors_cell_edit$col + 1] <- input$factors_cell_edit$value
+        #print(reVals$factorsTab)        
+    })
+    
+    
+    # Update factors table
+    observeEvent(input$updateFactors, {
+        #browser()
+        reVals$analysisOb <- addFactorsTab(isolate(reVals$analysisOb), isolate(reVals$factorsTab), isolate(reVals$curFacTabDx))
+        print(reVals$analysisOb)
+        updateSelectInput(session, "selectFacTab", choices = as.character(1:length(reVals$analysisOb@factorsTab)), selected =
+                              length(reVals$analysisOb@factorsTab) )
+        
+
+    })
+    
+    # Use drop down meunu to select the factors table
+    observeEvent(input$selectFacTab, {
+       # browser()
+        if (!(input$selectFacTab == "")){
+        reVals$curFacTabDx <- as.numeric(input$selectFacTab)
+        reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$curFacTabDx]]
+        }
+        print(reVals$factorsTab)
+
+
+
+    })
+    # Add a new factor table
+    observeEvent(input$newFacTab, {
+        #browser()
+        reVals$curFacTabDx <- length(reVals$analysisOb@factorsTab) + 1
+        reVals$factorsTab = tibble(Factors = "", Level1 = "", Level2 = "")
+
+    })
+    
+    # Remove a factor table
+    observeEvent(input$rmFacTab, {
+        
+        print(reVals$analysisOb)
+        reVals$analysisOb <- rmFactorsTab(isolate(reVals$analysisOb), isolate(reVals$factorsTab), isolate(reVals$curFacTabDx))
+        print(reVals$analysisOb)
+        
+        if (length(reVals$analysisOb@factorsTab) > 0){
+        updateSelectInput(session, "selectFacTab", choices = as.character(1:length(reVals$analysisOb@factorsTab)), selected = 1)
+            reVals$factorsTab <- reVals$analysisOb@factorsTab[[1]]
+        }else
+        {
+            updateSelectInput(session, "selectFacTab", choices = NULL)
+            reVals$factorsTab = tibble(Factors = "", Level1 = "", Level2 = "")
+            
+        }
+            
+        reVals$curFacTabDx <- 1
         
         
     })
     
+    ### Exp Factor table ------------------------------------------------------------------------------------------- ###
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###

@@ -11,10 +11,15 @@
 # 
 # x <- new("student", age = c(1, 23, 45))
 # show(x)
+library(dplyr)
 
-setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame"))
+setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list"
+                                        ))
 # GeneCntTables contains the gene count tables for an experiment
 
+# Methods
+
+# Add new gene counts table
 setGeneric(name="newGeneCnts",
            def=function(object, geneCntTab, geneMeta)
            {
@@ -45,6 +50,7 @@ setMethod(f="newGeneCnts", # fntion name
           }
 )
 
+# Remove gene counts table
 setGeneric(name="rmGeneCnts",
            def=function(object, rwDx)
            {
@@ -65,5 +71,43 @@ setMethod(f="rmGeneCnts",
           }
           )
 
+# Add new factors table
+setGeneric(name = "addFactorsTab", 
+           def=function(object, facTab, dx)
+           {
+             standardGeneric("addFactorsTab")
+             
+           }
+           )
+
+setMethod(f="addFactorsTab", 
+          signature = "RNASeqAnalysis",
+          definition=function(object, facTab, dx){
+          #browser()
+            object@factorsTab[[dx]] <- facTab 
+           
+            return(object) 
+          }
+          )
+
+# Remove factors table
+
+setGeneric(name = "rmFactorsTab", 
+           def=function(object, facTab, rwDx)
+           {
+             standardGeneric("rmFactorsTab")
+             
+           }
+)
+
+setMethod(f="rmFactorsTab", 
+          signature = "RNASeqAnalysis",
+          definition=function(object, facTab, rwDx){
+            #browser()
+            object@factorsTab <- object@factorsTab[!(1:length(object@factorsTab) %in% rwDx)] # remove data 
+            
+            return(object) 
+          }
+)
 
 
