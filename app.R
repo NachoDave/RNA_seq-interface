@@ -80,7 +80,11 @@ ui <- fluidPage(
                                 h4('Assign Factors'),
                                 DT::dataTableOutput('assignfactors'),
                                 
-                            ),                            
+                            ),
+                            fluidRow(
+                                
+                                actionButton("updtAssignFacs", "Update assign factors")
+                            )
                             ),
                    ),
                    tabPanel("Data Exploration"),
@@ -103,8 +107,12 @@ server <- function(input, output, session) {
     # Reactive values ---------------------------------------------------------------------------------- # 
  
     reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), 
-                             factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1
+                             factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1,
+                             assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected")
                              )
+    
+    #assignFactorsTab <- tibble(Gene_Count_tab = "Nothing Selected") # tibble ot store the assign factors table
+    
     # analysisOb is an s4 class with slots to store analysis
     # geneCntIn stores the temporary file location of the gene count table when it is loaded
     # selectGnCnts 
@@ -326,6 +334,36 @@ server <- function(input, output, session) {
     })
     
     ### Exp Factor table ------------------------------------------------------------------------------------------- ###
+    
+    # Helper function for making checkbox
+    shinyInput = function(FUN, len, id,...) {
+        inputs = character(len)
+        for (i in seq_len(len)) {
+            inputs[i] = as.character(FUN(paste0(id, i), label = NULL, ...))
+        }
+        inputs
+    }
+    
+    observeEvent(input$updtAssignFacs,{
+        browser()
+        
+        
+        reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@GeneMeta[input$genCntTabTab_rows_selected, 1])
+        for (dx in 1:3){
+            reVals$assignFactorsTab[, paste0("Level ", as.character(dx))] <-
+                                          shinyInput(selectInput,
+                                                               length(input$genCntTabTab_rows_selected),
+                                                               'cb_',
+                                                               choices=as.character(1:length(input$genCntTabTab_rows_selected))) # overwrite the assignFactorsTab
+
+        }
+    output$assignfactors <- DT::renderDataTable(isolate(reVals$assignFactorsTab), server = FALSE, escape = FALSE, selection = 'none', options = list(
+        dom = 't', paging = FALSE, ordering = FALSE,
+        preDrawCallback = JS('function() { Shiny.unbindAll(this.api().table().node()); }'),
+        drawCallback = JS('function() { Shiny.bindAll(this.api().table().node()); } ')
+    ),rownames=FALSE)
+    
+    })
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
