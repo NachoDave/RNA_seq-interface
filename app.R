@@ -344,6 +344,19 @@ server <- function(input, output, session) {
         inputs
     }
     
+    # helper function for reading selections
+    shinyValue = function(id, len) {
+        unlist(lapply(seq_len(len), function(i) {
+            value = input[[paste0(id, i)]]
+            if (is.null(value)){
+                NA
+            } else {
+                value
+            }
+        }))
+    }
+    
+    # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$updtAssignFacs,{
         browser()
         
