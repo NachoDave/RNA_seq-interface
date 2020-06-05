@@ -19,9 +19,10 @@ ui <- fluidPage(
     fluidRow(
         # Left menu shwing analysis and loaded files
         column(3, style = "background-color:lightblue;", 
-               fluidRow("Analysis Options"),
+               fluidRow(h4("Analysis Options")),
                fluidRow(actionButton("newAnalysisactBut","Start New Analysis")),
                fluidRow(fileInput(label = "Load Analysis", inputId = "loadAnalysis")),
+               fluidRow(h4('Save Analysis')),
                fluidRow(shinyDirButton("dir", "Select Save Directory", "Upload"),
                         verbatimTextOutput("dir", placeholder = TRUE)  
                ),
@@ -47,10 +48,13 @@ ui <- fluidPage(
         # Main menus showing analysis options
         column(9,
                tabsetPanel(
+                   ## QC tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Quality Control", 
                             column(4),
                             ), # Check fastq qc
-                   tabPanel("Normalization",
+                   
+                   ## Factors tab panel ---------------------------------------------------------------------------## 
+                   tabPanel("Factors",
                             column(1),
                             column(11,
                             fluidRow(
@@ -87,7 +91,14 @@ ui <- fluidPage(
                             )
                             ),
                    ),
+                   ## Normalization tab panel ---------------------------------------------------------------------------## 
+                   tabPanel("Normalization", 
+                            h3("Normalization using DESeq2 methods")),                        
+                   
+                   ## Data Exploration tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Data Exploration"),
+                   
+                   ## Differential Analysis tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Differential Analysis"), # Check overlaps
                    tabPanel("Genelists/Sequences"),
                    tabPanel("Pathway Analysis"),
@@ -358,18 +369,23 @@ server <- function(input, output, session) {
     
     # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$updtAssignFacs,{
-        browser()
+        #browser()
         
         
         reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@GeneMeta[input$genCntTabTab_rows_selected, 1])
-        for (dx in 1:3){
-            reVals$assignFactorsTab[, paste0("Level ", as.character(dx))] <-
+        
+        
+        for (dx in 1:nrow(reVals$factorsTab[,1])){
+            
+            reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
                                           shinyInput(selectInput,
                                                                length(input$genCntTabTab_rows_selected),
                                                                'cb_',
-                                                               choices=as.character(1:length(input$genCntTabTab_rows_selected))) # overwrite the assignFactorsTab
+                                                               choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
 
         }
+        
+         
     output$assignfactors <- DT::renderDataTable(isolate(reVals$assignFactorsTab), server = FALSE, escape = FALSE, selection = 'none', options = list(
         dom = 't', paging = FALSE, ordering = FALSE,
         preDrawCallback = JS('function() { Shiny.unbindAll(this.api().table().node()); }'),
