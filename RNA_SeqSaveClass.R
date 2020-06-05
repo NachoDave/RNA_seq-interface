@@ -37,12 +37,14 @@ setMethod(f="newGeneCnts", # fntion name
             
             # Add the meta Data
             
+            
             if (ncol(object@GeneMeta) == 0){
-              
+              geneMeta$ID <- 1  
               object@GeneMeta <- (geneMeta)
-              colnames(object@GeneMeta) <- c( "Description", "FileName")
+              colnames(object@GeneMeta) <- c( "Description", "FileName", "ID")
               
             } else{
+              geneMeta$ID <- max(object@GeneMeta$ID) + 1
               object@GeneMeta[nrow(object@GeneMeta) + 1,] <- geneMeta  
             }
 

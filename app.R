@@ -37,11 +37,13 @@ ui <- fluidPage(
                #fluidRow(DTOutput("genCntTbl")),
                fluidRow(
                    
-                   h4('Uploaded Gene Count tables'),
+                   
                    DT::dataTableOutput('genCntTabTab'),
                    #verbatimTextOutput('y12')
                ),
-               fluidRow(actionButton("removeGnCnt", "Remove Gene Count Table"))
+               fluidRow(actionButton("removeGnCnt", "Remove Gene Count Table")),
+               fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
+              
 
         )
         ,
@@ -175,22 +177,49 @@ server <- function(input, output, session) {
                  },
                  handlerExpr = {
                      if (!"path" %in% names(dir())) return()
-                     home <- normalizePath("~")
+                     home <- normalizePath("/data/RNASeqAnalysis")
                      global$datapath <-
                          file.path(home, paste(unlist(dir()$path[-1]), collapse = .Platform$file.sep))
                      #print(global$datapath)
                      output$dir <- renderText({
                          global$datapath
-                     }) 
+                     })
                  })
 
-    
+    # Save the analysis
     observeEvent(input$saveAnalysis, {
+        #browser()
+        saveReVals <- reVals$analysisOb
         
-        #saveRDS(analysisOb, )
-        
+        if (input$saveFn == ""){save(saveReVals, file = paste0(global$datapath, "/", "RNASeqAnalysis.rData"))}
+        else {save(saveReVals, file = paste0(global$datapath, "/",input$saveFn, ".rData"))}
+
     })
     
+    # load analysis
+    observeEvent(input$loadAnalysis,
+                 {
+                     
+                     browser()
+                     if ( is.null(input$loadAnalysis)) return(NULL)
+                     inFile <- input$loadAnalysis
+                     file <- inFile$datapath
+                     # load the file into new environment and get it from there
+                     e = new.env()
+                     name <- load(file, envir = e)
+                     reVals$analysisOb <- e[[name]]
+                     
+                     # Recreate the tables etc
+                     # Gene counts table table
+                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
+                     
+                     # Factors tables and drp downs
+                     updateSelectInput(session, "selectFacTab", choices = as.character(1:length(reVals$analysisOb@factorsTab)), selected =
+                                           length(reVals$analysisOb@factorsTab) )
+                     
+                     # Sample experiment table
+                     
+                 })
     
     # Modal dialog box for writing a description ------------------------------------------------- #
     dataModal <- function(failed = FALSE) {
@@ -216,7 +245,7 @@ server <- function(input, output, session) {
         #print(input$loadCntTab$name)
         reVals$geneCntIn <- read.csv(input$loadCntTab$datapath, skip = 4, sep = "\t")
         colnames(reVals$geneCntIn) <- c("ENSEMBL_ID", "+", "-", "All")
-        print(head(reVals$geneCntIn))
+        #print(head(reVals$geneCntIn))
         #print(analysisOb)
         
         # show description dialog
