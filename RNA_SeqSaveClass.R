@@ -13,8 +13,7 @@
 # show(x)
 library(dplyr)
 
-setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list"
-                                        ))
+setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list"))
 # GeneCntTables contains the gene count tables for an experiment
 
 # Methods
@@ -113,3 +112,42 @@ setMethod(f="rmFactorsTab",
 )
 
 
+# Add Experimental sample table
+
+setGeneric(name = "addExpSmpTab", 
+           def=function(object, smpExpTab, nm, facDx)
+           {
+             standardGeneric("addExpSmpTab")
+             
+           }
+)
+
+setMethod(f="addExpSmpTab", 
+          signature = "RNASeqAnalysis",
+          definition=function(object, smpExpTab, nm, facDx){
+            #browser()
+            object@ExpSmpTab[[nm]] <- smpExpTab 
+            object@ExpSmpFactorsTab[[nm]] <- facDx
+            return(object) 
+          }
+)
+
+# Remove Experimental sample table
+
+setGeneric(name = "rmExpSmpTab", 
+           def=function(object,  nm)
+           {
+             standardGeneric("rmExpSmpTab")
+             
+           }
+)
+
+setMethod(f="rmExpSmpTab", 
+          signature = "RNASeqAnalysis",
+          definition=function(object, nm){
+            #browser()
+            object@ExpSmpTab[[nm]] <- NULL 
+            object@ExpSmpFactorsTab[[nm]] <- NULL
+            return(object) 
+          }
+)

@@ -83,13 +83,17 @@ ui <- fluidPage(
                                 actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
                                      ),
                             fluidRow(
-                                h4('Assign Factors'),
+                                h4('Experiment sample table'),
+                                textInput("nameExpSamTab", "Experiment Sample table name", placeholder = "Experiment name"),
+                                selectInput(inputId = "selectExpSmp", label = "Select Experiment sample table", choices = NULL),
                                 DT::dataTableOutput('assignfactors'),
                                 
                             ),
                             fluidRow(
                                 
-                                actionButton("updtAssignFacs", "Update assign factors")
+                                actionButton("newExpSmpTab", "New Sample Exp table"), # start a new assign factors table
+                                actionButton("saveExpSmpTab", "Save Sample Exp table"),
+                                actionButton("rmExpSmpTab", "Remove Sample Exp table")
                             )
                             ),
                    ),
@@ -148,6 +152,8 @@ server <- function(input, output, session) {
         print(input$loadAnalysis$name)
 
         # Import the rdata object and assign the analysis object to analysisOb
+        #browser()
+        
         
         # Load fastq results
         
@@ -200,7 +206,7 @@ server <- function(input, output, session) {
     observeEvent(input$loadAnalysis,
                  {
                      
-                     browser()
+                     #browser()
                      if ( is.null(input$loadAnalysis)) return(NULL)
                      inFile <- input$loadAnalysis
                      file <- inFile$datapath
@@ -218,6 +224,8 @@ server <- function(input, output, session) {
                                            length(reVals$analysisOb@factorsTab) )
                      
                      # Sample experiment table
+                     updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = names(reVals$analysisOb@ExpSmpTab)[[1]]) # update drop down
+                     # read in values
                      
                  })
     
@@ -375,13 +383,22 @@ server <- function(input, output, session) {
     
     ### Exp Factor table ------------------------------------------------------------------------------------------- ###
     
-    # Helper function for making checkbox
+    # Helper function for making dropdown multi row
     shinyInput = function(FUN, len, id,...) {
         inputs = character(len)
         for (i in seq_len(len)) {
             inputs[i] = as.character(FUN(paste0(id, i), label = NULL, ...))
         }
         inputs
+    }
+    
+    # Helper function for making dropdown single row
+    shinyInput1 = function(FUN, idx, id,...) {
+      inputs = character(idx)
+      #for (i in seq_len(len)) {
+      inputs = as.character(FUN(paste0(id, idx), label = NULL, ...))
+      #}
+      inputs
     }
     
     # helper function for reading selections
@@ -396,20 +413,64 @@ server <- function(input, output, session) {
         }))
     }
     
+    # helper function to read drop down menu tabs from ExpSamp DT into tibble (with correct options)
+    readDropDownDTtoTib = function(dt){
+      
+      for (dx in 2:ncol(dt)){
+        
+        dt[colnames(dt[dx])] <- shinyValue(colnames(dt[dx]),nrow(dt))
+        
+      }
+   
+      return(dt)
+      
+    }
+    
+    # helper function to read drop down menu tabs from tibble DT into ExpSamp (with correct options)
+    readTibToDropDown = function(tib, facs){
+      #browser()
+      # tib = the selected factors
+      # facs = the associated factors table
+       
+    for (cx in 1:nrow(tib)){
+
+      for (dx in 1:nrow(facs[,1])){
+      sel <- tib[[cx, facs[[dx, 1]]]] # get the selected option
+        tib[cx, facs[[dx, 1]]] <-
+          shinyInput1(selectInput,
+                     cx,
+                     facs[[dx,1]],
+                     choices=as.character(facs[dx, 2:ncol(facs)]), selected = sel) # overwrite the assignFactorsTab
+
+      }
+    }
+
+      reVals$assignFactorsTab <- tib
+   # browser()
+      # render
+      output$assignfactors <- DT::renderDataTable(isolate(tib), server = FALSE, escape = FALSE, selection = 'none', options = list(
+        dom = 't', paging = FALSE, ordering = FALSE,
+        preDrawCallback = JS('function() { Shiny.unbindAll(this.api().table().node()); }'),
+        drawCallback = JS('function() { Shiny.bindAll(this.api().table().node()); } ')
+      ),rownames=FALSE)
+
+      
+    }
+ 
     # Update the assign factors table when update assign factors button is pushed
-    observeEvent(input$updtAssignFacs,{
+    observeEvent(input$newExpSmpTab,{
         #browser()
         
         
         reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@GeneMeta[input$genCntTabTab_rows_selected, 1])
         
         
-        for (dx in 1:nrow(reVals$factorsTab[,1])){
+        for (dx in 1:nrow(reVals$factorsTab[,1])){ # add factor columns
             
             reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
                                           shinyInput(selectInput,
                                                                length(input$genCntTabTab_rows_selected),
-                                                               'cb_',
+                                                               reVals$factorsTab[[dx,1]],
                                                                choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
 
         }
@@ -421,6 +482,85 @@ server <- function(input, output, session) {
         drawCallback = JS('function() { Shiny.bindAll(this.api().table().node()); } ')
     ),rownames=FALSE)
     
+    })
+    
+    # save an example table
+    observeEvent(input$saveExpSmpTab, {
+      #browser()
+      ## I'm not sure why, but upon exiting the save the reVals$assignFacTab object stops being a 
+      ## tibble and becomes a 'shiny.render.function'. In this case we can't save the table. This
+      ## bit of code converts it back so you can change an already saved table#
+      
+      # At the moment you can't change an exp factors table
+      if (any(class(reVals$assignFactorsTab) == "shiny.render.function")){
+        reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1])
+      
+      reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmp]]]]
+      
+      for (dx in 1:nrow(reVals$factorsTab[,1])){ # add factor columns
+        
+        reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
+          shinyInput(selectInput,
+                     length(reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1]),
+                     reVals$factorsTab[[dx,1]],
+                     choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
+        
+      }
+      }
+      
+      
+      
+      if (ncol(reVals$assignFactorsTab) > 1){
+      # create new dataframe
+      
+      curExpSmpVals <- readDropDownDTtoTib(reVals$assignFactorsTab)
+      
+      # write name to analysis object (from the text input)
+      if (input$nameExpSamTab == ""){ # check if the object has a name
+        
+        showModal(modalDialog(title = "Warning", "Please give your experiment sample table a name"))
+        
+      } else if (input$nameExpSamTab %in% names(reVals$analysisOb@ExpSmpFactorsTab)){
+        showModal(modalDialog(title = "Warning", "Experiment sample table name already exists"))
+      } 
+            else{
+        
+        # write table to analysis object
+        reVals$analysisOb <- addExpSmpTab(reVals$analysisOb, curExpSmpVals, input$nameExpSamTab, as.numeric(input$selectFacTab))
+        
+        # Update dropdown
+        updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = input$nameExpSamTab)
+        
+      }
+      
+
+    }
+    }
+    )
+    
+    # re render table with sample drop down
+    observeEvent(input$selectExpSmp, {
+      
+      #browser()
+      if(!(input$selectExpSmp == "")){
+      reVals$assignFactorsTab <- readTibToDropDown(reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]], 
+                                                   reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmp]]]])
+      }
+      
+      
+    })
+    
+    # remove experimental sample
+    observeEvent(input$rmExpSmpTab, {
+      #browser()
+      reVals$analysisOb <- rmExpSmpTab(reVals$analysisOb, input$selectExpSmp)
+      
+      if (length(reVals$analysisOb@ExpSmpTab) < 1){
+        showModal(modalDialog(title = "Warning", "No I like this one, I don't want to delete it. (Ok so it makes the code so much easier if I don't have at least one table)"))
+      }else{
+      updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = names(reVals$analysisOb@ExpSmpFactorsTab)[[1]])
+      }
+      
     })
     
 ### ================================================================================================================ ###
