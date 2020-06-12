@@ -12,6 +12,8 @@ library(shinyFiles)
 library(DT)
 library(dplyr)
 source("RNA_SeqSaveClass.R")
+source("analysisFunctions.R")
+source("DESeqResults.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -70,7 +72,7 @@ ui <- fluidPage(
 
                             ), 
                             fluidRow(
-                                h4('Factors (double click on table cell to fill in)'),
+                                h4('Factors (double click on table cell to fill in, put control factors in level 1)'),
                                 DT::dataTableOutput('factors'),
                                 ),
                             fluidRow(actionButton(label = "Update", inputId = "updateFactors")
@@ -94,12 +96,28 @@ ui <- fluidPage(
                                 actionButton("newExpSmpTab", "New Sample Exp table"), # start a new assign factors table
                                 actionButton("saveExpSmpTab", "Save Sample Exp table"),
                                 actionButton("rmExpSmpTab", "Remove Sample Exp table")
+                                
                             )
                             ),
                    ),
                    ## Normalization tab panel ---------------------------------------------------------------------------## 
-                   tabPanel("Normalization", 
-                            h3("Normalization using DESeq2 methods")),                        
+                   tabPanel("Normalization", column(1),
+                            column(11,
+                            h3("Normalization using DESeq2 median of ratios (we will add other methods if needed)"),
+                            fluidRow(textInput("nrmedCntsName", "Name normed counts"),
+                                     h4("Select Design Factors"),
+                                     DT::dataTableOutput("selectDesignFactors")),
+                            fluidRow(
+                            selectInput(inputId = "selectExpSmpNrm", label = "Select Experiment sample table for normalization", choices = NULL),
+                            actionButton("newNrmCnts", "Add normalized Counts"), actionButton("rmNrmCnts", "Remove normalized counts"), 
+                            
+                            ),
+                            fluidRow(h3("Normed Count Matrices")),
+                            fluidRow(DT::dataTableOutput("nrmed")),
+                            
+                            )
+                            
+                            ),                        
                    
                    ## Data Exploration tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Data Exploration"),
@@ -562,6 +580,46 @@ server <- function(input, output, session) {
       }
       
     })
+    
+    
+## Normalization tab ============================================================================================== ###
+     # Set the select experimental sample table, set to be same as the one on the factors page
+    observeEvent(input$selectExpSmp, {
+      
+      #browser()
+      updateSelectInput(session, "selectExpSmpNrm", choices = names(reVals$analysisOb@ExpSmpTab), selected = input$selectExpSmp)
+      
+    })
+    
+    # When select Exp sample for normalization is selected update selectDesignFactors table
+    observeEvent(input$selectExpSmpNrm, {
+      #browser()
+      if (!input$selectExpSmpNrm == ""){
+      output$selectDesignFactors = DT::renderDataTable((reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmpNrm]]]])["Factors"], server = FALSE, options = list(dom = 't'))
+     }
+    })
+    
+    # Create a new normed counts deseq2dataset
+    observeEvent(input$newNrmCnts, {
+      #browser()
+      
+      if (input$nrmedCntsName == ""){showModal(modalDialog(title = "Warning", "Please give the normed counts DESeq dataset a name"))}
+      else{
+        
+        browser()
+        desFac <- (reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmpNrm]]]])["Factors"][input$selectDesignFactors_rows_selected,]
+        if (isEmpty(desFac)){
+          showModal(modalDialog(title = "Warning", "No Design factors selected"))
+        }else {
+          
+          reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName)
+          
+        }
+      }
+      browser()
+      
+    })
+    
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###

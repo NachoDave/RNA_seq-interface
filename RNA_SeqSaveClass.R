@@ -13,7 +13,8 @@
 # show(x)
 library(dplyr)
 
-setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list"))
+setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list",
+                                        DESeqNrmCnts = "list", DESeqNrmCntsExpSmp = "list"))
 # GeneCntTables contains the gene count tables for an experiment
 
 # Methods
@@ -151,3 +152,24 @@ setMethod(f="rmExpSmpTab",
             return(object) 
           }
 )
+
+# Add deseq data set
+setGeneric(name = "addDESeqDS", 
+           def=function(object, ds, nm, smExpNm)
+           {
+             standardGeneric("addDESeqDS")
+             
+           }
+)
+
+setMethod(f="addDESeqDS", 
+          signature = "RNASeqAnalysis",
+          definition=function(object, ds, nm, smExpNm){
+            #browser()
+            object@DESeqNrmCnts[[nm]] <- ds
+            object@DESeqNrmCntsExpSmp[[nm]] <- smExpNm
+            return(object) 
+          }
+)
+
+# Remove deseq2 data
