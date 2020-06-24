@@ -14,8 +14,12 @@
 library(dplyr)
 
 setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list",
-                                        DESeqNrmCnts = "list", DESeqNrmCntsExpSmp = "list"))
+                                        NrmCnts = "list", NrmCntsExpSmp = "list"))
 # GeneCntTables contains the gene count tables for an experiment
+# factorsTab contains a list of the factors tables in the current analysis
+# ExpSmpTab contain a list of the experimental sample tables in the current analysis
+# NrmCnts contains normalized counts matrices objects (see ??)
+# NrmCntsExpSmp contains the ExpSmpTab tables from which the normalized counts were generated
 
 # Methods
 
@@ -153,21 +157,21 @@ setMethod(f="rmExpSmpTab",
           }
 )
 
-# Add deseq data set
-setGeneric(name = "addDESeqDS", 
+# Add NrmCnts data set
+setGeneric(name = "addNrmCntsDS", 
            def=function(object, ds, nm, smExpNm)
            {
-             standardGeneric("addDESeqDS")
+             standardGeneric("addNrmCntsDS")
              
            }
 )
 
-setMethod(f="addDESeqDS", 
+setMethod(f="addNrmCntsDS", 
           signature = "RNASeqAnalysis",
           definition=function(object, ds, nm, smExpNm){
             #browser()
-            object@DESeqNrmCnts[[nm]] <- ds
-            object@DESeqNrmCntsExpSmp[[nm]] <- smExpNm
+            object@NrmCnts[[nm]] <- ds
+            object@NrmCntsExpSmp[[nm]] <- smExpNm
             return(object) 
           }
 )

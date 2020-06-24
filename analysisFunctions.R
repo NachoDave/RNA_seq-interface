@@ -1,6 +1,7 @@
 ## 
 library(DESeq2)
 source("RNA_SeqSaveClass.R")
+source("nrmCntResults.R")
 
 deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm){
   
@@ -8,7 +9,7 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm){
   # and creates the count matrix and colData to create a DESeq2 object and normalizes
   # designFacs contains the names of the design factors
   
-  browser()
+  #browser()
   
   colDt <- ob@ExpSmpTab[[expSmpNm]]
   # make count matrix
@@ -33,7 +34,7 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm){
   desFacFrm <- "~"
   # make design formula
   cnt <- 0
-  for (dx in designFacs$Factors){
+  for (dx in rev(designFacs$Factors)){
     print(dx)
     cnt <- cnt + 1 
     if (cnt > 1){
@@ -48,8 +49,12 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm){
   dd <- DESeqDataSetFromMatrix(countData = gnCntMat, colData = colDt, design =  as.formula(desFacFrm))
   dd <- estimateSizeFactors(dd)
   
-  ob <- addDESeqDS(ob, dd, ddsNm, expSmpNm)
-  
+  # Create a nrmCnt save object and add results
+  nrmCntOb <- new("NrmCntResults")
+  nrmCntOb <- addDESeqNrmCnts(nrmCntOb, dd, expSmpNm, paste(designFacs$Factors, collapse = "+"))
   browser()
+  ob <- addNrmCntsDS(ob, nrmCntOb, ddsNm, expSmpNm)
+  
+  #browser()
   return(ob)
 }

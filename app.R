@@ -14,7 +14,7 @@ library(dplyr)
 source("RNA_SeqSaveClass.R")
 source("analysisFunctions.R")
 source("DESeqResults.R")
-
+options(shiny.maxRequestSize = 30*1024^2)
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     
@@ -109,11 +109,12 @@ ui <- fluidPage(
                                      DT::dataTableOutput("selectDesignFactors")),
                             fluidRow(
                             selectInput(inputId = "selectExpSmpNrm", label = "Select Experiment sample table for normalization", choices = NULL),
-                            actionButton("newNrmCnts", "Add normalized Counts"), actionButton("rmNrmCnts", "Remove normalized counts"), 
+                            actionButton("newDESeqNrmCnts", "New DESeq2 Norm"), actionButton("rmNrmCnts", "Remove normalized counts"), 
                             
                             ),
-                            fluidRow(h3("Normed Count Matrices")),
-                            fluidRow(DT::dataTableOutput("nrmed")),
+                            #fluidRow(,
+                            fluidRow(h3("Normed Count Matrices"),
+                                     DT::dataTableOutput("nrmCntsDT")),
                             
                             )
                             
@@ -143,7 +144,8 @@ server <- function(input, output, session) {
  
     reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), 
                              factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1,
-                             assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected")
+                             assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected"),
+                             nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = "")
                              )
     
     #assignFactorsTab <- tibble(Gene_Count_tab = "Nothing Selected") # tibble ot store the assign factors table
@@ -245,6 +247,15 @@ server <- function(input, output, session) {
                      updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = names(reVals$analysisOb@ExpSmpTab)[[1]]) # update drop down
                      # read in values
                      
+                     # Normalized reads table
+                     browser()
+                     if (length(reVals$analysisOb@NrmCnts) > 0){
+                       
+                       
+                     reVals$nrmedCntsTab <- tibble(Name = names(reVals$analysisOb@NrmCnts), `Exp Smp List` = unlist(reVals$analysisOb@NrmCntsExpSmp), 
+                                                   `Norm Method` = unlist(lapply(1:length(reVals$analysisOb@NrmCnts), function(x) reVals$analysisOb@NrmCnts[[x]]@NrmMethod)), 
+                                                   `Design Factors` = unlist(lapply(1:length(reVals$analysisOb@NrmCnts), function(x) reVals$analysisOb@NrmCnts[[x]]@design)))
+                 }
                  })
     
     # Modal dialog box for writing a description ------------------------------------------------- #
@@ -270,13 +281,20 @@ server <- function(input, output, session) {
         #print(reVals$analysisOb)
         #print(input$loadCntTab$name)
         reVals$geneCntIn <- read.csv(input$loadCntTab$datapath, skip = 4, sep = "\t")
+         # check if the data has 4 columns
+        if (ncol(reVals$geneCntIn) != 4){
+          
+          showModal(modalDialog(title = "Warning", "Data does not have 4 columns, cannot load"))
+          
+        }
+        else{
         colnames(reVals$geneCntIn) <- c("ENSEMBL_ID", "+", "-", "All")
         #print(head(reVals$geneCntIn))
         #print(analysisOb)
         
         # show description dialog
         showModal(dataModal())
-
+        }
     })
     # close dialog box on clck ok
     observeEvent(input$ok, {
@@ -477,10 +495,33 @@ server <- function(input, output, session) {
  
     # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$newExpSmpTab,{
-        #browser()
+        browser()
         
+      ## You need to remove the ui drop downs from the currently displayed table. If you don't and the new table has factor
+      ## names which are the same as the old one, it wil use the selected values from the old table and not update
+      
+      # Get the factor names from the currently displayed table
+      if (length(reVals$analysisOb@ExpSmpTab) > 0){
+      curTb <- reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]] 
+      curFacN <- ncol(curTb) - 1
+      curFacs <- colnames(curTb[, 2:(curFacN + 1)])
+      curGnCntN <- nrow(curTb)
+      
+      # Loop through factors and remove ui
+      
+      for (dx in 1:curFacN){
         
+        for(ex in 1:curGnCntN){
+          
+          removeUI(selector = paste0("#", curFacs[dx], ex), immediate = T)
+          
+        }
+   
+      }
+      }
+      # Create a new empty table
         reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@GeneMeta[input$genCntTabTab_rows_selected, 1])
+        
         
         
         for (dx in 1:nrow(reVals$factorsTab[,1])){ # add factor columns
@@ -504,10 +545,13 @@ server <- function(input, output, session) {
     
     # save an example table
     observeEvent(input$saveExpSmpTab, {
-      #browser()
+      browser()
+      
+      # Loop through and remove the UI objects
+      
       ## I'm not sure why, but upon exiting the save the reVals$assignFacTab object stops being a 
       ## tibble and becomes a 'shiny.render.function'. In this case we can't save the table. This
-      ## bit of code converts it back so you can change an already saved table#
+      ## bit of code converts it back so you can change an already saved table
       
       # At the moment you can't change an exp factors table
       if (any(class(reVals$assignFactorsTab) == "shiny.render.function")){
@@ -526,8 +570,7 @@ server <- function(input, output, session) {
       }
       }
       
-      
-      
+     
       if (ncol(reVals$assignFactorsTab) > 1){
       # create new dataframe
       
@@ -584,6 +627,8 @@ server <- function(input, output, session) {
     
 ## Normalization tab ============================================================================================== ###
      # Set the select experimental sample table, set to be same as the one on the factors page
+   # browser()
+   output$nrmCntsDT = DT::renderDataTable(reVals$nrmedCntsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe')
     observeEvent(input$selectExpSmp, {
       
       #browser()
@@ -600,13 +645,17 @@ server <- function(input, output, session) {
     })
     
     # Create a new normed counts deseq2dataset
-    observeEvent(input$newNrmCnts, {
+    observeEvent(input$newDESeqNrmCnts, {
       #browser()
       
       if (input$nrmedCntsName == ""){showModal(modalDialog(title = "Warning", "Please give the normed counts DESeq dataset a name"))}
+      else if(input$nrmedCntsName %in% names(reVals$analysisOb@NrmCnts)){
+        showModal(modalDialog(title = "Warning", "Normed counts name already used"))
+        
+      }
       else{
         
-        browser()
+        #browser()
         desFac <- (reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmpNrm]]]])["Factors"][input$selectDesignFactors_rows_selected,]
         if (isEmpty(desFac)){
           showModal(modalDialog(title = "Warning", "No Design factors selected"))
@@ -614,11 +663,32 @@ server <- function(input, output, session) {
           
           reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName)
           
+          browser()
+          
+          if (reVals$nrmedCntsTab$Name[1] == ""){
+            
+            reVals$nrmedCntsTab <- tibble(Name = names(reVals$analysisOb@NrmCnts), `Exp Smp List` = reVals$analysisOb@NrmCntsExpSmp[[1]], `Norm Method` = reVals$analysisOb@NrmCnts[[1]]@NrmMethod,
+                                          `Design Factors` = reVals$analysisOb@NrmCnts[[1]]@design)
+            
+          } else {
+            
+            reVals$nrmedCntsTab <- rbind(reVals$nrmedCntsTab , tibble(Name =last(names(reVals$analysisOb@NrmCnts)), `Exp Smp List` = last(reVals$analysisOb@NrmCntsExpSmp), 
+                                                                      `Norm Method` = last(reVals$analysisOb@NrmCnts)@NrmMethod, `Design Factors` = last(reVals$analysisOb@NrmCnts)@design))
+            
+          }         
+          
+          
+          
         }
       }
-      browser()
+
+      
+      #output$nrmCntsDT <- DT::renderDataTable(isolate(reVals$nrmedCntsTab), server = FALSE, options = list(dom = 't'))
+      
       
     })
+    
+    # 
     
     
 ### ================================================================================================================ ###
