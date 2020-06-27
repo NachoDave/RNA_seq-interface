@@ -11,6 +11,8 @@ library(shiny)
 library(shinyFiles)
 library(DT)
 library(dplyr)
+library(ggplot2)
+library(plotly)
 source("RNA_SeqSaveClass.R")
 source("analysisFunctions.R")
 source("DESeqResults.R")
@@ -109,6 +111,7 @@ ui <- fluidPage(
                                      DT::dataTableOutput("selectDesignFactors")),
                             fluidRow(
                             selectInput(inputId = "selectExpSmpNrm", label = "Select Experiment sample table for normalization", choices = NULL),
+                            numericInput(inputId = "rmLowCnts", label = "Remove genes with total counts less than:", value = 10),
                             actionButton("newDESeqNrmCnts", "New DESeq2 Norm"), actionButton("rmNrmCnts", "Remove normalized counts"), 
                             
                             ),
@@ -124,7 +127,19 @@ ui <- fluidPage(
                    tabPanel("Data Exploration"),
                    
                    ## Differential Analysis tab panel ---------------------------------------------------------------------------## 
-                   tabPanel("Differential Analysis"), # Check overlaps
+                   tabPanel("Differential Analysis", # Check overlaps
+                   column(1),
+                   column(11,
+                          fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsDiff", choices = NULL), 
+                                   selectInput(label = "Select Contrast Factor", inputId = "selectNrmCntsCntrst", choices = NULL),
+                                   selectInput(label = "Select constrast conidtion", inputId = "selectNrmCntsCnd", choices = NULL)),
+                          fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
+                          fluidRow(mainPanel(plotlyOutput("MAPlot"))),
+                          fluidRow(actionButton(label = "MA Plot", inputId = "plotMA"), checkboxInput(label = "Perform LFC", inputId = "doLFC"),
+                                   actionButton(label = "Save MA Plot", inputId = "saveMAPlt"))
+                          ),
+                   
+                   ),
                    tabPanel("Genelists/Sequences"),
                    tabPanel("Pathway Analysis"),
                    tabPanel("")
@@ -138,7 +153,7 @@ ui <- fluidPage(
 # Server code ========================================================================================== ###
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-    
+   output$MAPlot <- renderPlotly(plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length))
  
     # Reactive values ---------------------------------------------------------------------------------- # 
  
@@ -248,14 +263,31 @@ server <- function(input, output, session) {
                      # read in values
                      
                      # Normalized reads table
-                     browser()
+                     #browser()
                      if (length(reVals$analysisOb@NrmCnts) > 0){
                        
                        
                      reVals$nrmedCntsTab <- tibble(Name = names(reVals$analysisOb@NrmCnts), `Exp Smp List` = unlist(reVals$analysisOb@NrmCntsExpSmp), 
                                                    `Norm Method` = unlist(lapply(1:length(reVals$analysisOb@NrmCnts), function(x) reVals$analysisOb@NrmCnts[[x]]@NrmMethod)), 
                                                    `Design Factors` = unlist(lapply(1:length(reVals$analysisOb@NrmCnts), function(x) reVals$analysisOb@NrmCnts[[x]]@design)))
-                 }
+                     }
+                     
+                     # DifferentiaL analysis tab
+                     # Populate drop downs
+                     if (length(reVals$analysisOb@NrmCnts) > 0){
+                     updateSelectInput(session, "selectNrmCntsDiff", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
+                       # p = reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[reVals$analysisOb@NrmCnts[[1]]@ExpSampNm]]]]  # this is evil
+                       # # 
+                       # updateSelectInput(session, "selectNrmCntsCntrst",
+                       #                   choices = p$Factors,  # this is evil
+                       #                   selected = p$Factors[1])
+                       # 
+                       # 
+                       # 
+                       # updateSelectInput(session, "selectNrmCntsCnd",
+                       #                   choices = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)]),
+                       #                   select = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)])[1])
+                     }
                  })
     
     # Modal dialog box for writing a description ------------------------------------------------- #
@@ -661,9 +693,9 @@ server <- function(input, output, session) {
           showModal(modalDialog(title = "Warning", "No Design factors selected"))
         }else {
           
-          reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName)
+          reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName, input$rmLowCnts)
           
-          browser()
+          #browser()
           
           if (reVals$nrmedCntsTab$Name[1] == ""){
             
@@ -677,8 +709,22 @@ server <- function(input, output, session) {
             
           }         
           
-          
-          
+          #update normalised counts to select drop down
+          updateSelectInput(session, "selectNrmCntsDiff", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
+          #browser()
+          # p = reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[reVals$analysisOb@NrmCnts[[1]]@ExpSampNm]]]]  # this is evil
+          # # 
+          # updateSelectInput(session, "selectNrmCntsCntrst",
+          #                   choices = p$Factors,  # this is evil
+          #                   selected = p$Factors[1])
+          # 
+          # 
+          # 
+          # updateSelectInput(session, "selectNrmCntsCnd",
+          #                   choices = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)]),
+          #                   select = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)])[1])
+          # 
+          # 
         }
       }
 
@@ -688,8 +734,55 @@ server <- function(input, output, session) {
       
     })
     
-    # 
+    ## Differential tab ============================================================================================== ###
+     # update normalised counts to select drop down
+    #updateSelectInput(session, "selectNrmCntsDiff", choices = names(reVals$analysisOb@nrmCnts))
     
+    # need to update the contrast drop down if the nrmed counts change changes
+    observeEvent(input$selectNrmCntsDiff, {
+      #browser()
+      if (length(reVals$analysisOb@NrmCnts) > 0){
+      p = unlist(strsplit(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@design, '\\+'))  # this is evil
+      #p <- p[!(p == "+")]
+      # 
+      updateSelectInput(session, "selectNrmCntsCntrst",
+                        choices = p,  # this is evil
+                        selected = p[[1]])
+      }
+      
+    })
+    
+    # need to update the condition drop down if the contrast changes
+    
+    observeEvent(input$selectNrmCntsCntrst, {
+      
+      #browser()
+      
+      if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+        tNrmCntsSel <- reVals$analysisOb@NrmCntsExpSmp[[input$selectNrmCntsDiff]] # get the expSmpTab in the currently selected nrmcounts tbale
+      tFacTabSel <- reVals$analysisOb@ExpSmpFactorsTab[[tNrmCntsSel]] # get index of factors table
+      tFacTab <- reVals$analysisOb@factorsTab[[tFacTabSel]] # get the factors tab
+      tLev <- as.character(tFacTab[tFacTab[,1] == input$selectNrmCntsCntrst, ][2:ncol(tFacTab)])
+      updateSelectInput(session, "selectNrmCntsCnd", 
+                        choices = tLev, 
+                        selected = tLev[[1]])
+      }
+      
+    })
+    
+    observeEvent(input$runDESeq2, {
+      
+      
+      reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff)
+
+    })
+    
+    
+    observeEvent(input$plotMA, {
+      
+      
+      
+    })
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
