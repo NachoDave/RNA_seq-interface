@@ -14,12 +14,25 @@
 library(dplyr)
 
 setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list",
-                                        NrmCnts = "list", NrmCntsExpSmp = "list"))
+                                        NrmCnts = "list", NrmCntsExpSmp = "list", State = "data.frame"))
 # GeneCntTables contains the gene count tables for an experiment
 # factorsTab contains a list of the factors tables in the current analysis
 # ExpSmpTab contain a list of the experimental sample tables in the current analysis
 # NrmCnts contains normalized counts matrices objects (see ??)
 # NrmCntsExpSmp contains the ExpSmpTab tables from which the normalized counts were generated
+# State stores the current state of the app so that it can be reloaded
+
+# Constructor (set the state of the )
+setMethod(f = "initialize", signature = "RNASeqAnalysis",
+          definition= function(.Object){
+            
+            #print("Constructing!")
+            .Object@State <- data.frame(selected = rep("0", 5), stringsAsFactors = F)
+            rownames(.Object@State) <- c("nrmCnts", "contrastFac", "contrastCond", "factorsTab", "expSmpTab")
+            
+            return(.Object)
+          })
+
 
 # Methods
 

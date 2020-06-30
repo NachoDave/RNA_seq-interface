@@ -15,8 +15,9 @@ library(ggplot2)
 library(plotly)
 source("RNA_SeqSaveClass.R")
 source("analysisFunctions.R")
-source("DESeqResults.R")
-options(shiny.maxRequestSize = 30*1024^2)
+source("nrmCntResults.R")
+source("plottingFunctions.R")
+options(shiny.maxRequestSize = 50*1024^2)
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     
@@ -129,15 +130,25 @@ ui <- fluidPage(
                    ## Differential Analysis tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Differential Analysis", # Check overlaps
                    column(1),
-                   column(11,
+                   column(3,
+                          fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
                           fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsDiff", choices = NULL), 
                                    selectInput(label = "Select Contrast Factor", inputId = "selectNrmCntsCntrst", choices = NULL),
-                                   selectInput(label = "Select constrast conidtion", inputId = "selectNrmCntsCnd", choices = NULL)),
-                          fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
+                                   selectInput(label = "Select constrast condition", inputId = "selectNrmCntsCnd", choices = NULL)),
+                          fluidRow(actionButton(label = "Get DESeq2 results", inputId = "deseqResAct"), checkboxInput(label = "LFC", inputId = "LFCSelect")),
+                          fluidRow(actionButton(label = "MA Plot", inputId = "plotMAAct"), actionButton(label = "LFC MA Plot", inputId = "lfcplotMAAct")), 
+                          fluidRow(actionButton(label = "Volcano Plot", inputId = "plotVolcanoAct"), actionButton(label = "LFC Volcano Plot", inputId = "lfcplotVolcanoAct")), 
+                          fluidRow(),
+                          fluidRow(actionButton(label = "Save MA Plot", inputId = "saveMAPltAct"), actionButton(label = "Save LFC MA Plot", inputId = "saveLFCMAPltAct")), 
+                          fluidRow(actionButton(label = "Save Volcano Plot", inputId = "saveVolcanoPltAct"), actionButton(label = "Save LFC Volcano Plot", inputId = "saveLFCVolcanoPltAct")), 
+                   ),
+
+                          column(7, 
                           fluidRow(mainPanel(plotlyOutput("MAPlot"))),
-                          fluidRow(actionButton(label = "MA Plot", inputId = "plotMA"), checkboxInput(label = "Perform LFC", inputId = "doLFC"),
-                                   actionButton(label = "Save MA Plot", inputId = "saveMAPlt"))
+                          fluidRow(mainPanel(plotlyOutput("volPlot"))),
                           ),
+                          
+                          
                    
                    ),
                    tabPanel("Genelists/Sequences"),
@@ -153,7 +164,7 @@ ui <- fluidPage(
 # Server code ========================================================================================== ###
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-   output$MAPlot <- renderPlotly(plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length))
+   #output$MAPlot <- renderPlotly(plot_ly(data = iris, x = ~Sepal.Length, y = ~Petal.Length))
  
     # Reactive values ---------------------------------------------------------------------------------- # 
  
@@ -250,14 +261,20 @@ server <- function(input, output, session) {
                      name <- load(file, envir = e)
                      reVals$analysisOb <- e[[name]]
                      
+                     #browser()
+                     # Add the directory and file name to the save directory
+                     updateTextInput(session, "saveFn", value = gsub(".rData", "", inFile$name)) 
+                     
                      # Recreate the tables etc
                      # Gene counts table table
                      output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
                      
                      # Factors tables and drp downs
+                     #browser()
+                     if (length(reVals$analysisOb@factorsTab) > 0){
                      updateSelectInput(session, "selectFacTab", choices = as.character(1:length(reVals$analysisOb@factorsTab)), selected =
                                            length(reVals$analysisOb@factorsTab) )
-                     
+                        }
                      # Sample experiment table
                      updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = names(reVals$analysisOb@ExpSmpTab)[[1]]) # update drop down
                      # read in values
@@ -409,14 +426,15 @@ server <- function(input, output, session) {
     
     # Use drop down meunu to select the factors table
     observeEvent(input$selectFacTab, {
-       # browser()
+        #browser()
         if (!(input$selectFacTab == "")){
         reVals$curFacTabDx <- as.numeric(input$selectFacTab)
         reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$curFacTabDx]]
+        reVals$analysisOb@State["factorsTab", "selected"] <- input$selectFacTab
         }
-        print(reVals$factorsTab)
+        #print(reVals$factorsTab)
 
-
+        
 
     })
     # Add a new factor table
@@ -527,7 +545,7 @@ server <- function(input, output, session) {
  
     # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$newExpSmpTab,{
-        browser()
+        #browser()
         
       ## You need to remove the ui drop downs from the currently displayed table. If you don't and the new table has factor
       ## names which are the same as the old one, it wil use the selected values from the old table and not update
@@ -577,7 +595,7 @@ server <- function(input, output, session) {
     
     # save an example table
     observeEvent(input$saveExpSmpTab, {
-      browser()
+      #browser()
       
       # Loop through and remove the UI objects
       
@@ -740,6 +758,7 @@ server <- function(input, output, session) {
     
     # need to update the contrast drop down if the nrmed counts change changes
     observeEvent(input$selectNrmCntsDiff, {
+      reVals$analysisOb@State["nrmCnts", "selected"] <- input$selectNrmCntsDiff
       #browser()
       if (length(reVals$analysisOb@NrmCnts) > 0){
       p = unlist(strsplit(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@design, '\\+'))  # this is evil
@@ -750,38 +769,109 @@ server <- function(input, output, session) {
                         selected = p[[1]])
       }
       
-    })
-    
-    # need to update the condition drop down if the contrast changes
-    
-    observeEvent(input$selectNrmCntsCntrst, {
-      
-      #browser()
-      
       if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
         tNrmCntsSel <- reVals$analysisOb@NrmCntsExpSmp[[input$selectNrmCntsDiff]] # get the expSmpTab in the currently selected nrmcounts tbale
       tFacTabSel <- reVals$analysisOb@ExpSmpFactorsTab[[tNrmCntsSel]] # get index of factors table
       tFacTab <- reVals$analysisOb@factorsTab[[tFacTabSel]] # get the factors tab
       tLev <- as.character(tFacTab[tFacTab[,1] == input$selectNrmCntsCntrst, ][2:ncol(tFacTab)])
-      updateSelectInput(session, "selectNrmCntsCnd", 
-                        choices = tLev, 
+      updateSelectInput(session, "selectNrmCntsCnd",
+                        choices = tLev,
                         selected = tLev[[1]])
       }
       
     })
     
-    observeEvent(input$runDESeq2, {
-      
-      
-      reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff)
+    # need to update the condition drop down if the contrast changes
+    
+    observeEvent(input$selectNrmCntsCntrst, {
+      reVals$analysisOb@State["contrastFac", "selected"] <- input$selectNrmCntsCntrst
+
+      #browser()
+
+    if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+      tNrmCntsSel <- reVals$analysisOb@NrmCntsExpSmp[[input$selectNrmCntsDiff]] # get the expSmpTab in the currently selected nrmcounts tbale
+    tFacTabSel <- reVals$analysisOb@ExpSmpFactorsTab[[tNrmCntsSel]] # get index of factors table
+    tFacTab <- reVals$analysisOb@factorsTab[[tFacTabSel]] # get the factors tab
+    tLev <- as.character(tFacTab[tFacTab[,1] == input$selectNrmCntsCntrst, ][2:ncol(tFacTab)])
+    updateSelectInput(session, "selectNrmCntsCnd",
+                      choices = tLev,
+                      selected = tLev[[1]])
+      }
 
     })
     
+    observeEvent(input$selectNrmCntsCnd, {
+      #browser()
+      reVals$analysisOb@State["contrastCond", "selected"] <- input$selectNrmCntsCnd
+      
+    })
     
-    observeEvent(input$plotMA, {
+    # Run DESeq
+    observeEvent(input$runDESeq2, {
       
-      
-      
+      if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+        nt <- showNotification("DESeq2 Running", duration = NULL)
+      reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff)
+        removeNotification(nt)
+      } else {
+        
+        showModal(modalDialog(title = "Warning", "No Normalized counts found"))
+      }
+    })
+    
+    # get DESeq results
+    observeEvent(input$deseqResAct, 
+                 {
+                   #browser()
+                   if (length(reVals$analysisOb@NrmCntsExpSmp) > 1) # 
+                   {x <- deseq2Res(reVals$analysisOb, input$selectNrmCntsDiff, input$selectNrmCntsCntrst, input$selectNrmCntsCnd, input$LFCSelect)
+                    if(any(class(x) == "error")){
+                      showModal(modalDialog(title = "Warning", x$message))
+                    }
+                    else {
+                      reVals$analysisOb <- x
+                      browser()
+                      # Make MA plot
+                      
+                      fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+                       output$MAPlot <-renderPlotly(fig)
+                       
+                       fig2 <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+                       output$volPlot <- renderPlotly(fig2)
+                      
+                    }
+                   
+                   }
+                   else {
+                     
+                     showModal(modalDialog(title = "Warning", "No Normalized counts found"))
+                   }
+                  # browser()
+                   
+                   
+                 })
+    
+    
+    observeEvent(input$plotMAAct, {
+      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res) > 0 )
+     { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+      output$MAPlot <-renderPlotly(fig)}
+      else
+      {
+        showModal(modalDialog(title = "Warning", "DESeq2 results not found, have you computed them yet?"))
+        
+      }
+    })
+    
+    observeEvent(input$lfcplotMAAct, {
+      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
+      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC)
+      output$MAPlot <-renderPlotly(fig)}
+      else
+      {
+        showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+        
+      }
     })
     
 ### ================================================================================================================ ###

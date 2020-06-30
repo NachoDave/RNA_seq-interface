@@ -74,24 +74,35 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
 # Function to perform differential analysis on DESeq2 object
 
 deseq2DA <- function(ob, nrmCnts){
-  browser()
+  #browser()
   ob@NrmCnts[[nrmCnts]]@dds <- DESeq(ob@NrmCnts[[nrmCnts]]@dds)
   return(ob)
 }
 
 # Make DESeq2 results
 
-deseq2Res <- function(ob, nrmCnts, fac, cntrst){
+deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE){
   
   # ob - analysis object
   # nrmCnts - name of the normed counts
   # fac - the analysis factor
   # Cntrst - the control level
-  browser()
+  #browser()
   
   levs <- levels(ob@NrmCnts[[nrmCnts]]@dds@colData@listData[[fac]])
   cntrstDESeq <- c(fac, cntrst, levs[!levs == cntrst])
   
-  ob@NrmCnts[[nrmCnts]]@dds <- results(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq)
+  tryCatch(
+    {ob@NrmCnts[[nrmCnts]] <- addDESeqRes(ob@NrmCnts[[nrmCnts]], results(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq)) 
+    if (LFC){
+      
+      ob@NrmCnts[[nrmCnts]] <- addDESeqResLFC(ob@NrmCnts[[nrmCnts]], lfcShrink(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq))
+      
+    }
+    return(ob)
+    },
+    error = function(e){return(e)}
+  )
+  
   
 }

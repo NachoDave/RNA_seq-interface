@@ -1,7 +1,8 @@
 library(DESeq2)
 library(dplyr)
 # class to save the nrm results
-setClass("NrmCntResults", slots = list(dds = "DESeqDataSet", ExpSampNm = "character", NrmCnts = "matrix", NrmMethod = "character", design = "character"))
+setClass("NrmCntResults", slots = list(dds = "DESeqDataSet", ExpSampNm = "character", NrmCnts = "matrix", NrmMethod = "character", design = "character", 
+                                       res = "list", resLFC = "list"))
 
 # dds - a deseq2 dataset (this is optional)
 # expSampNm - name of experimental sample table used to generate counts matrix
@@ -37,8 +38,47 @@ setMethod(f="addDESeqNrmCnts",
 
 
 # Remove DESeq2 data
+#To be continued.....
 
+#Add a DESeq2 results class
+setGeneric(name = "addDESeqRes",
+           def=function(object, dsRes)
+           {
+             standardGeneric("addDESeqRes")
 
+           }
+)
 
+setMethod(f="addDESeqRes",
+          signature = "NrmCntResults",
+          definition=function(object, dsRes){
+            # ds is the DESeq object
+            # smExpNm refers to the sample experiment list used to generate the normed object
+            #
+            #browser()
+            object@res[[1]] <- dsRes
+            return(object)
+          }
+)
 
+# Add a LFC DESeq2 ResLFCults class
+setGeneric(name = "addDESeqResLFC",
+           def=function(object, dsResLFC)
+           {
+             standardGeneric("addDESeqResLFC")
+
+           }
+)
+
+setMethod(f="addDESeqResLFC",
+          signature = "NrmCntResults",
+          definition=function(object, dsResLFC){
+            # ds is the DESeq object
+            # smExpNm refers to the sample experiment list used to generate the normed object
+            #
+            #browser()
+            object@resLFC[[1]] <- dsResLFC
+            return(object)
+          }
+)
 # Add other methods
