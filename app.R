@@ -139,13 +139,24 @@ ui <- fluidPage(
                           fluidRow(actionButton(label = "MA Plot", inputId = "plotMAAct"), actionButton(label = "LFC MA Plot", inputId = "lfcplotMAAct")), 
                           fluidRow(actionButton(label = "Volcano Plot", inputId = "plotVolcanoAct"), actionButton(label = "LFC Volcano Plot", inputId = "lfcplotVolcanoAct")), 
                           fluidRow(),
-                          fluidRow(actionButton(label = "Save MA Plot", inputId = "saveMAPltAct"), actionButton(label = "Save LFC MA Plot", inputId = "saveLFCMAPltAct")), 
-                          fluidRow(actionButton(label = "Save Volcano Plot", inputId = "saveVolcanoPltAct"), actionButton(label = "Save LFC Volcano Plot", inputId = "saveLFCVolcanoPltAct")), 
+                          # fluidRow(actionButton(label = "Save MA Plot", inputId = "saveMAPltAct"), actionButton(label = "Save LFC MA Plot", inputId = "saveLFCMAPltAct")), 
+                          # fluidRow(actionButton(label = "Save Volcano Plot", inputId = "saveVolcanoPltAct"), actionButton(label = "Save LFC Volcano Plot", inputId = "saveLFCVolcanoPltAct")), 
                    ),
 
-                          column(7, 
-                          fluidRow(mainPanel(plotlyOutput("MAPlot"))),
-                          fluidRow(mainPanel(plotlyOutput("volPlot"))),
+                          column(7, fluidRow(column(11, offset = 1, h3("Differential Analysis MA Plot"))),
+                          (fluidRow(column(9,plotlyOutput("MAPlot")), column(2,
+                                  numericInput(label = "Lower Limit Y", inputId = "MAlwLimY", value = ""), 
+                                   numericInput(label = "Upper Limit Y", inputId = "MAupLimY", value = ""), 
+                                   numericInput(label = "Lower Limit X", inputId = "MAlwLimX", value = ""), 
+                                   numericInput(label = "Upper Limit X", inputId = "MAupLimX", value = ""),
+                                   actionButton(label = "Replot", inputId = "replotMA")))),
+                          fluidRow(column(11, offset = 1, h3("Differential Analysis Volcano Plot"))),
+                          (fluidRow(column(9,plotlyOutput("volPlot")), column(2,
+                                                                              numericInput(label = "Lower LimitY", inputId = "vollwLimY", value = ""), 
+                                                                             numericInput(label = "Upper LimitY", inputId = "volupLimY", value = ""), 
+                                                                             numericInput(label = "Lower Limit X", inputId = "vollwLimX", value = ""), 
+                                                                             numericInput(label = "Upper Limit X", inputId = "volupLimX", value = ""),
+                                                                             actionButton(label = "Replot", inputId = "replotVol")))),
                           ),
                           
                           
@@ -171,7 +182,8 @@ server <- function(input, output, session) {
     reVals <- reactiveValues(geneSetDes = "", analysisOb = new("RNASeqAnalysis"), geneCntIn = NULL, selectedGnCnts = c(), 
                              factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1,
                              assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected"),
-                             nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = "")
+                             nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = ""),
+                             maFig = ggplotly(), volFig = ggplotly()
                              )
     
     #assignFactorsTab <- tibble(Gene_Count_tab = "Nothing Selected") # tibble ot store the assign factors table
@@ -829,16 +841,31 @@ server <- function(input, output, session) {
                       showModal(modalDialog(title = "Warning", x$message))
                     }
                     else {
+                      nt <- showNotification("Getting DESeq2 Results", duration = NULL)
                       reVals$analysisOb <- x
-                      browser()
+                      #browser()
                       # Make MA plot
                       
-                      fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
-                       output$MAPlot <-renderPlotly(fig)
+                      reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+                       output$MAPlot <-renderPlotly(reVals$maFig)
                        
-                       fig2 <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
-                       output$volPlot <- renderPlotly(fig2)
-                      
+                       updateNumericInput(session, "MAlwLimX", value = reVals$maFig$x$layout$xaxis$range[1])
+                       updateNumericInput(session, "MAupLimX", value = reVals$maFig$x$layout$xaxis$range[2])
+                       
+                       updateNumericInput(session, "MAlwLimY", value = reVals$maFig$x$layout$yaxis$range[1])
+                       updateNumericInput(session, "MAupLimY", value = reVals$maFig$x$layout$yaxis$range[2])
+                       
+                       #browser()
+                       reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+                       output$volPlot <- renderPlotly(reVals$volFig)
+                       
+                       updateNumericInput(session, "vollwLimX", value = reVals$volFig$x$layout$xaxis$range[1])
+                       updateNumericInput(session, "volupLimX", value = reVals$volFig$x$layout$xaxis$range[2])
+                       
+                       updateNumericInput(session, "vollwLimY", value = reVals$volFig$x$layout$yaxis$range[1])
+                       updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2])                       
+                       
+                       removeNotification(nt)
                     }
                    
                    }
@@ -865,7 +892,7 @@ server <- function(input, output, session) {
     
     observeEvent(input$lfcplotMAAct, {
       if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
-      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC)
+      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
       output$MAPlot <-renderPlotly(fig)}
       else
       {
@@ -873,6 +900,43 @@ server <- function(input, output, session) {
         
       }
     })
+    
+    observeEvent(input$plotVolcanoAct, {
+      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res) > 0 )
+      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+      output$MAPlot <-renderPlotly(fig)}
+      else
+      {
+        showModal(modalDialog(title = "Warning", "DESeq2 results not found, have you computed them yet?"))
+        
+      }
+    })
+    
+    observeEvent(input$lfcplotVolcanoAct, {
+      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
+      { fig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
+      output$volPlot <-renderPlotly(fig)}
+      else
+      {
+        showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+        
+      }
+    })
+    
+    # Replot MA with limits
+    observeEvent(input$replotMA, {
+      reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res, 
+                             xlim = c(input$MAlwLimX, input$MAupLimX), 
+                             ylims = c(input$MAlwLimY, input$MAupLimY)) # need to say if its LFC or not??
+      output$MAPlot <-renderPlotly(reVals$maFig)
+      
+      updateNumericInput(session, "MAlwLimX", value = reVals$maFig$x$layout$xaxis$range[1])
+      updateNumericInput(session, "MAupLimX", value = reVals$maFig$x$layout$xaxis$range[2])
+      
+      updateNumericInput(session, "MAlwLimY", value = reVals$maFig$x$layout$yaxis$range[1])
+      updateNumericInput(session, "MAupLimY", value = reVals$maFig$x$layout$yaxis$range[2])
+    }
+    )
     
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
