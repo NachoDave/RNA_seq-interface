@@ -72,32 +72,52 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
 }
 
 # Function to perform differential analysis on DESeq2 object
+# 
+# deseq2DA <- function(ob, nrmCnts){
+#   browser()
+#   ob@NrmCnts[[nrmCnts]]@dds <- DESeq(ob@NrmCnts[[nrmCnts]]@dds)
+#   return(ob)
+# }
 
-deseq2DA <- function(ob, nrmCnts){
-  #browser()
+# Make DESeq2 results
+
+deseq2DA <- function(ob, nrmCnts, cntrstRef, cntrstCnd){
+  browser()
+  
+  ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]] <- relevel(ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]], ref = cntrstCnd)
   ob@NrmCnts[[nrmCnts]]@dds <- DESeq(ob@NrmCnts[[nrmCnts]]@dds)
   return(ob)
 }
 
 # Make DESeq2 results
 
-deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE){
+deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE, lfcMethod = "apeglm"){
   
   # ob - analysis object
   # nrmCnts - name of the normed counts
   # fac - the analysis factor
   # Cntrst - the control level
-  #browser()
+  browser()
   
+  # When labelling the comparison conditions DESeq2 puts the control variable 2nd on the contrast and coef
   levs <- levels(ob@NrmCnts[[nrmCnts]]@dds@colData@listData[[fac]])
-  cntrstDESeq <- c(fac, cntrst, levs[!levs == cntrst])
+  cntrstDESeq <- c(fac, levs[!levs == cntrst], cntrst  ) # now using the coef to allow the type of LFC to be set to apeglm
+  coefDESeq <- paste(fac, levs[!levs == cntrst], 'vs', cntrst,   sep = "_")
   
   tryCatch(
     {ob@NrmCnts[[nrmCnts]] <- addDESeqRes(ob@NrmCnts[[nrmCnts]], results(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq)) 
+    #{ob@NrmCnts[[nrmCnts]] <- addDESeqRes(ob@NrmCnts[[nrmCnts]], results(ob@NrmCnts[[nrmCnts]]@dds, coef = coefDESeq)) 
     if (LFC){
       
-      ob@NrmCnts[[nrmCnts]] <- addDESeqResLFC(ob@NrmCnts[[nrmCnts]], lfcShrink(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq))
-      
+      if (lfcMethod =="normal") # use the contrast for normal LFC/ use the coef for the others
+      {
+        ob@NrmCnts[[nrmCnts]] <- addDESeqResLFC(ob@NrmCnts[[nrmCnts]], lfcShrink(ob@NrmCnts[[nrmCnts]]@dds, contrast = cntrstDESeq, type = lfcMethod))
+      }
+      else
+      {
+        ob@NrmCnts[[nrmCnts]] <- addDESeqResLFC(ob@NrmCnts[[nrmCnts]], lfcShrink(ob@NrmCnts[[nrmCnts]]@dds, coef = coefDESeq, type = lfcMethod))
+        
+      }
     }
     return(ob)
     },

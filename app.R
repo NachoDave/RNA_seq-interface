@@ -20,6 +20,18 @@ source("plottingFunctions.R")
 options(shiny.maxRequestSize = 50*1024^2)
 # Define UI for application that draws a histogram
 ui <- fluidPage(
+  
+  # use css to define boxes around groups of buttons
+  tags$head(tags$style(
+    HTML('
+         #DESeqRun, #DESeqGetRes {
+            border: 1px solid black;
+        }
+        body, label, input, button, select { 
+          font-family: "Arial";
+        }')
+  )),
+  
     
     fluidRow(
         # Left menu shwing analysis and loaded files
@@ -129,18 +141,42 @@ ui <- fluidPage(
                    
                    ## Differential Analysis tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Differential Analysis", # Check overlaps
-                   column(1),
+                   
                    column(3,
-                          fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
-                          fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsDiff", choices = NULL), 
+                          sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqRun",
+                                fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsDiff", choices = NULL), 
                                    selectInput(label = "Select Contrast Factor", inputId = "selectNrmCntsCntrst", choices = NULL),
                                    selectInput(label = "Select constrast condition", inputId = "selectNrmCntsCnd", choices = NULL)),
-                          fluidRow(actionButton(label = "Get DESeq2 results", inputId = "deseqResAct"), checkboxInput(label = "LFC", inputId = "LFCSelect")),
-                          fluidRow(actionButton(label = "MA Plot", inputId = "plotMAAct"), actionButton(label = "LFC MA Plot", inputId = "lfcplotMAAct")), 
-                          fluidRow(actionButton(label = "Volcano Plot", inputId = "plotVolcanoAct"), actionButton(label = "LFC Volcano Plot", inputId = "lfcplotVolcanoAct")), 
-                          fluidRow(),
-                          # fluidRow(actionButton(label = "Save MA Plot", inputId = "saveMAPltAct"), actionButton(label = "Save LFC MA Plot", inputId = "saveLFCMAPltAct")), 
-                          # fluidRow(actionButton(label = "Save Volcano Plot", inputId = "saveVolcanoPltAct"), actionButton(label = "Save LFC Volcano Plot", inputId = "saveLFCVolcanoPltAct")), 
+                                fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
+                                
+                              ),
+                                      mainPanel(width = 0)
+                                      
+                                
+                          ),
+                          
+                          
+                          sidebarLayout(
+                            sidebarPanel(width = 12, id = "DESeqGetRes",
+                              fluidRow(actionButton(label = "Get DESeq2 results", inputId = "deseqResAct"), 
+                                       checkboxInput(label = "Calculate LFC", inputId = "LFCSelect"),
+                                       selectInput(label = "Select LFC Method", inputId = "LFCMethod", choices = c("apeglm", "ashr", "normal"))
+                                       ),
+                          
+                            ),
+                            mainPanel(width = 0)
+                          ),
+                          
+                          
+                          sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqGetRes", 
+                                fluidRow(actionButton(label = "MA Plot", inputId = "plotMAAct")), 
+                                fluidRow(actionButton(label = "Volcano Plot", inputId = "plotVolcanoAct")),
+                                checkboxInput(label = "Plot LFC Result?", inputId = "plotLFCChk")
+                              ), 
+                              mainPanel(width = 0)
+                          )
                    ),
 
                           column(7, fluidRow(column(11, offset = 1, h3("Differential Analysis MA Plot"))),
@@ -781,7 +817,7 @@ server <- function(input, output, session) {
                         selected = p[[1]])
       }
       
-      if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+      if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
         tNrmCntsSel <- reVals$analysisOb@NrmCntsExpSmp[[input$selectNrmCntsDiff]] # get the expSmpTab in the currently selected nrmcounts tbale
       tFacTabSel <- reVals$analysisOb@ExpSmpFactorsTab[[tNrmCntsSel]] # get index of factors table
       tFacTab <- reVals$analysisOb@factorsTab[[tFacTabSel]] # get the factors tab
@@ -800,7 +836,7 @@ server <- function(input, output, session) {
 
       #browser()
 
-    if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+    if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
       tNrmCntsSel <- reVals$analysisOb@NrmCntsExpSmp[[input$selectNrmCntsDiff]] # get the expSmpTab in the currently selected nrmcounts tbale
     tFacTabSel <- reVals$analysisOb@ExpSmpFactorsTab[[tNrmCntsSel]] # get index of factors table
     tFacTab <- reVals$analysisOb@factorsTab[[tFacTabSel]] # get the factors tab
@@ -820,10 +856,11 @@ server <- function(input, output, session) {
     
     # Run DESeq
     observeEvent(input$runDESeq2, {
-      
-      if(length(reVals$analysisOb@NrmCntsExpSmp) > 1){
+    
+      if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
+        browser()
         nt <- showNotification("DESeq2 Running", duration = NULL)
-      reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff)
+      reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff, input$selectNrmCntsCntrst, input$selectNrmCntsCnd)
         removeNotification(nt)
       } else {
         
@@ -835,8 +872,8 @@ server <- function(input, output, session) {
     observeEvent(input$deseqResAct, 
                  {
                    #browser()
-                   if (length(reVals$analysisOb@NrmCntsExpSmp) > 1) # 
-                   {x <- deseq2Res(reVals$analysisOb, input$selectNrmCntsDiff, input$selectNrmCntsCntrst, input$selectNrmCntsCnd, input$LFCSelect)
+                   if (length(reVals$analysisOb@NrmCntsExpSmp) > 0) # 
+                   {x <- deseq2Res(reVals$analysisOb, input$selectNrmCntsDiff, input$selectNrmCntsCntrst, input$selectNrmCntsCnd, input$LFCSelect, input$LFCMethod)
                     if(any(class(x) == "error")){
                       showModal(modalDialog(title = "Warning", x$message))
                     }
@@ -881,8 +918,41 @@ server <- function(input, output, session) {
     
     observeEvent(input$plotMAAct, {
       if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res) > 0 )
-     { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
-      output$MAPlot <-renderPlotly(fig)}
+     { 
+        
+        if (input$plotLFCChk) # check if plot the lfc checkbox is clicked
+        {
+          if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 ) # check if the lfc results have been computed
+          {
+            reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
+            output$MAPlot <-renderPlotly(reVals$maFig)
+            
+            updateNumericInput(session, "MAlwLimX", value = reVals$maFig$x$layout$xaxis$range[1])
+            updateNumericInput(session, "MAupLimX", value = reVals$maFig$x$layout$xaxis$range[2])
+            
+            updateNumericInput(session, "MAlwLimY", value = reVals$maFig$x$layout$yaxis$range[1])
+            updateNumericInput(session, "MAupLimY", value = reVals$maFig$x$layout$yaxis$range[2])
+            
+          } 
+          else
+          {
+            showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+          }
+        } 
+        else
+        {
+          reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+          output$MAPlot <-renderPlotly(reVals$maFig)
+          
+          updateNumericInput(session, "MAlwLimX", value = reVals$maFig$x$layout$xaxis$range[1])
+          updateNumericInput(session, "MAupLimX", value = reVals$maFig$x$layout$xaxis$range[2])
+          
+          updateNumericInput(session, "MAlwLimY", value = reVals$maFig$x$layout$yaxis$range[1])
+          updateNumericInput(session, "MAupLimY", value = reVals$maFig$x$layout$yaxis$range[2])
+
+        }
+            
+      }
       else
       {
         showModal(modalDialog(title = "Warning", "DESeq2 results not found, have you computed them yet?"))
@@ -890,21 +960,53 @@ server <- function(input, output, session) {
       }
     })
     
-    observeEvent(input$lfcplotMAAct, {
-      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
-      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
-      output$MAPlot <-renderPlotly(fig)}
-      else
-      {
-        showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
-        
-      }
-    })
+    # observeEvent(input$lfcplotMAAct, {
+    #   if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
+    #   { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
+    #   output$MAPlot <-renderPlotly(fig)}
+    #   else
+    #   {
+    #     showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+    #     
+    #   }
+    # })
     
     observeEvent(input$plotVolcanoAct, {
       if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res) > 0 )
-      { fig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
-      output$MAPlot <-renderPlotly(fig)}
+      { 
+        
+        if (input$plotLFCChk) # check if plot the lfc checkbox is clicked
+        {
+          if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 ) # check if the lfc results have been computed
+          {
+            reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
+            output$volPlot <-renderPlotly(reVals$volFig)
+            
+            updateNumericInput(session, "vollwLimX", value = reVals$volFig$x$layout$xaxis$range[1])
+            updateNumericInput(session, "volupLimX", value = reVals$volFig$x$layout$xaxis$range[2])
+            
+            updateNumericInput(session, "vollwLimY", value = reVals$volFig$x$layout$yaxis$range[1])
+            updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2]) 
+          } 
+          else
+          {
+            showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+          }
+        } 
+        else
+        {
+          reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res)
+          output$volPlot <-renderPlotly(reVals$volFig)
+
+          updateNumericInput(session, "vollwLimX", value = reVals$volFig$x$layout$xaxis$range[1])
+          updateNumericInput(session, "volupLimX", value = reVals$volFig$x$layout$xaxis$range[2])
+          
+          updateNumericInput(session, "vollwLimY", value = reVals$volFig$x$layout$yaxis$range[1])
+          updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2]) 
+          
+        }
+        
+      }
       else
       {
         showModal(modalDialog(title = "Warning", "DESeq2 results not found, have you computed them yet?"))
@@ -912,22 +1014,32 @@ server <- function(input, output, session) {
       }
     })
     
-    observeEvent(input$lfcplotVolcanoAct, {
-      if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
-      { fig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
-      output$volPlot <-renderPlotly(fig)}
-      else
-      {
-        showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
-        
-      }
-    })
+    # observeEvent(input$lfcplotVolcanoAct, {
+    #   if (length(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC) > 0 )
+    #   { fig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, tit = " (LFC)")
+    #   output$volPlot <-renderPlotly(fig)}
+    #   else
+    #   {
+    #     showModal(modalDialog(title = "Warning", "DESeq2 LFC results not found, have you computed them?"))
+    #     
+    #   }
+    # })
     
     # Replot MA with limits
     observeEvent(input$replotMA, {
-      reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res, 
+      if (input$plotLFCChk)
+      {
+        reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, 
+                               xlim = c(input$MAlwLimX, input$MAupLimX), 
+                               ylims = c(input$MAlwLimY, input$MAupLimY), tit = " (LFC)") # need to say if its LFC or not??
+      }
+      else
+      {
+        reVals$maFig <- maplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res, 
                              xlim = c(input$MAlwLimX, input$MAupLimX), 
                              ylims = c(input$MAlwLimY, input$MAupLimY)) # need to say if its LFC or not??
+      }
+      
       output$MAPlot <-renderPlotly(reVals$maFig)
       
       updateNumericInput(session, "MAlwLimX", value = reVals$maFig$x$layout$xaxis$range[1])
@@ -938,6 +1050,31 @@ server <- function(input, output, session) {
     }
     )
     
+    
+    observeEvent(input$replotVol, {
+      browser()
+      if (input$plotLFCChk)
+      {
+        reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, 
+                               xlim = c(input$vollwLimX, input$volupLimX), 
+                               ylims = c(input$vollwLimY, input$volupLimY), tit = " (LFC)") # need to say if its LFC or not??
+      }
+      else
+      {
+        reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@res, 
+                               xlim = c(input$vollwLimX, input$volupLimX), 
+                               ylims = c(input$vollwLimY, input$volupLimY)) # need to say if its LFC or not??
+      }
+      
+      output$volPlot <-renderPlotly(reVals$volFig)
+      
+      updateNumericInput(session, "vollwLimX", value = reVals$volFig$x$layout$xaxis$range[1])
+      updateNumericInput(session, "volupLimX", value = reVals$volFig$x$layout$xaxis$range[2])
+      
+      updateNumericInput(session, "vollwLimY", value = reVals$volFig$x$layout$yaxis$range[1])
+      updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2])
+    }
+    )
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
     

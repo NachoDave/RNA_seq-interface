@@ -3,7 +3,7 @@ library(ggplot2)
 library(plotly)
 
 maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
-  #browser()
+  browser()
   df <- as.data.frame(DEseqRes)
   df$`p < 0.05` <- df$padj < 0.05
   df$`p < 0.05`[is.na(df$`p < 0.05`)] = FALSE
@@ -18,17 +18,19 @@ maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   # set axis limits if given
     if (!is.null(xlims)){
     
-      plt <- plt + xlim(low = xlims[1], high = xlims[2])  
+      plt <- plt + scale_x_continuous(trans='log10', limits = 10^xlims) 
       
     }
-  
+  else
+  {
+    plt <- plt + scale_x_continuous(trans='log10')
+  } 
     if (!is.null(ylims)){
     
     plt <- plt + ylim(low = ylims[1], high = ylims[2])  
   }
-  
-  plt <- plt + scale_x_continuous(trans='log10')
-  
+
+
   # 
   fig <- ggplotly(plt, tooltip = c("text", "baseMean", "log2FoldChange")) %>% config(displaylogo = FALSE,
                                                                                      modeBarButtonsToRemove = list(
