@@ -3,7 +3,7 @@ library(ggplot2)
 library(plotly)
 
 maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
-  browser()
+  #browser()
   df <- as.data.frame(DEseqRes)
   df$`p < 0.05` <- df$padj < 0.05
   df$`p < 0.05`[is.na(df$`p < 0.05`)] = FALSE
@@ -76,13 +76,13 @@ volplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   
   if (!is.null(xlims)){
     
-    plt + xlim(low = xlims[1], high = xlims[2])  
+    plt <- plt + xlim(low = xlims[1], high = xlims[2])  
     
   }
   
   if (!is.null(ylims)){
     
-    plt + ylim(low = ylims[1], high = ylims[2])  
+    plt <- plt + ylim(low = ylims[1], high = ylims[2])  
   }
   
   

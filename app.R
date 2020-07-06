@@ -18,6 +18,7 @@ source("analysisFunctions.R")
 source("nrmCntResults.R")
 source("plottingFunctions.R")
 options(shiny.maxRequestSize = 50*1024^2)
+library(EnsDb.Hsapiens.v86)
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
@@ -59,7 +60,7 @@ ui <- fluidPage(
                    #verbatimTextOutput('y12')
                ),
                fluidRow(actionButton("removeGnCnt", "Remove Gene Count Table")),
-               fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
+               #fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
               
 
         )
@@ -198,7 +199,37 @@ ui <- fluidPage(
                           
                    
                    ),
-                   tabPanel("Genelists/Sequences"),
+                   tabPanel("Genelists/Sequences",
+                      column(3,
+                       sidebarLayout(
+                        sidebarPanel(width = 12, id = "DESeqRun",
+                          fluidRow(selectInput(label = "Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
+                          fluidRow(checkboxInput(label = "Use LFC", inputId = "LFCGeneList")),
+                          fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "Convert Gene IDs to symbols", choices = c("None", "Ensembl", "Entrez"))),
+                          fluidRow(actionButton(label = "Create New Gene List",inputId =  "createGeneList"), 
+                                   textInput(inputId = "nameGenelist", label = "Name Gene List"), 
+                                   actionButton(label = "Save Gene List to workspace", "saveGeneList"), 
+                                   actionButton(label = "Write Gene List to file", inputId = "writeGeneList")),
+                          #fluidRow(actionButton(label = "Write Gene List to file", inputId = "writeGeneList"))
+                         ),
+                                     mainPanel(width = 0)
+                       ),
+                      ),
+                      column(9,
+                             sidebarLayout(
+                               sidebarPanel(width = 12, id = "DESeqRun",
+                                fluidRow(h3("Gene List"),
+                                DT::dataTableOutput("geneListDT")),               
+                              ),
+                              mainPanel(width = 0)
+                               
+                             )
+                             
+                       )
+      
+                   ),
+                   
+                   
                    tabPanel("Pathway Analysis"),
                    tabPanel("")
                    
@@ -219,7 +250,8 @@ server <- function(input, output, session) {
                              factorsTab = tibble(Factors = "", Level1 = "", Level2 = ""), curFacTabDx = 1,
                              assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected"),
                              nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = ""),
-                             maFig = ggplotly(), volFig = ggplotly()
+                             maFig = ggplotly(), volFig = ggplotly(), 
+                             curGeneTab = data.frame()
                              )
     
     #assignFactorsTab <- tibble(Gene_Count_tab = "Nothing Selected") # tibble ot store the assign factors table
@@ -903,6 +935,7 @@ server <- function(input, output, session) {
                        updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2])                       
                        
                        removeNotification(nt)
+
                     }
                    
                    }
@@ -1052,7 +1085,7 @@ server <- function(input, output, session) {
     
     
     observeEvent(input$replotVol, {
-      browser()
+      #browser()
       if (input$plotLFCChk)
       {
         reVals$volFig <- volplot(reVals$analysisOb@NrmCnts[[input$selectNrmCntsDiff]]@resLFC, 
@@ -1075,9 +1108,89 @@ server <- function(input, output, session) {
       updateNumericInput(session, "volupLimY", value = reVals$volFig$x$layout$yaxis$range[2])
     }
     )
+    
+### Gene list tab ================================================================================================== ###
 ### ================================================================================================================ ###
 ### Output Objects ================================================================================================= ###
     
+    # Update the select diff analysis drop down
+    observeEvent(reVals$analysisOb@NrmCnts, 
+                 {
+                   updateSelectInput(session, "selectDiffAnl", choices = names(reVals$analysisOb@NrmCnts))
+                   
+                 })
+    
+    # create new genelist
+    observeEvent(input$createGeneList, {
+      
+      if (input$LFCGeneList && length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC) > 0){
+        #browser()
+        
+        if (input$convertGeneIDtoSym == "Ensembl"){
+          reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
+          # Get the gene IDs
+          
+          ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
+          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
+          reVals$curGeneTab$`Gene Symbol` <- ""
+          reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
+          reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
+          output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
+                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+          
+        }
+        else
+        {
+        output$geneListDT <- DT::renderDataTable(as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
+                                                 , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+        }
+      }
+      else if (length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res) > 0) {
+        
+        if (input$convertGeneIDtoSym == "Ensembl"){
+          reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res)
+          # Get the gene IDs
+          
+          ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
+          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
+          reVals$curGeneTab$`Gene Symbol` <- ""
+          reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
+          reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
+          output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
+                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+          
+        }
+        else
+        {
+          output$geneListDT <- DT::renderDataTable(as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res)
+                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+        }
+        
+      }
+      else {
+        
+        showModal(modalDialog(title = "warning", "No DESeq results found. Have you run 'Get DESeq2 Results' in the differential Analysis tab?"))
+        
+      }
+      
+    })
+    
+    # Create a gene list object
+    
+    observeEvent(input$saveGeneList, {
+      
+      browser()
+       # this is the command reVals$curGeneTab[input$geneListDT_rows_all,]
+      
+      # Check there's a table there
+      
+      
+      # Check for the name
+      
+      
+      # Write to the object
+      
+    })
     
     
  

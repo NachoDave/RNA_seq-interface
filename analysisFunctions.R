@@ -97,7 +97,7 @@ deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE, lfcMethod = "apeglm
   # nrmCnts - name of the normed counts
   # fac - the analysis factor
   # Cntrst - the control level
-  browser()
+  #browser()
   
   # When labelling the comparison conditions DESeq2 puts the control variable 2nd on the contrast and coef
   levs <- levels(ob@NrmCnts[[nrmCnts]]@dds@colData@listData[[fac]])
