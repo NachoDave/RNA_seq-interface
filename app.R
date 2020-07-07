@@ -201,6 +201,17 @@ ui <- fluidPage(
                    ),
                    tabPanel("Genelists/Sequences",
                       column(3,
+                        # Select Gene List panel
+                        sidebarLayout(
+                          sidebarPanel(width = 12, id = "DESeqRun",
+                                       selectInput(label = "Select Gene List", inputId = "selectGeneTableGnTab", choices = NULL)
+
+                          ),
+                          mainPanel(width = 0)
+                        ),
+                             
+                             
+                        # Create New gene list panel
                        sidebarLayout(
                         sidebarPanel(width = 12, id = "DESeqRun",
                           fluidRow(selectInput(label = "Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
@@ -209,17 +220,32 @@ ui <- fluidPage(
                           fluidRow(actionButton(label = "Create New Gene List",inputId =  "createGeneList"), 
                                    textInput(inputId = "nameGenelist", label = "Name Gene List"), 
                                    actionButton(label = "Save Gene List to workspace", "saveGeneList"), 
-                                   actionButton(label = "Write Gene List to file", inputId = "writeGeneList")),
+                                   ),
                           #fluidRow(actionButton(label = "Write Gene List to file", inputId = "writeGeneList"))
                          ),
                                      mainPanel(width = 0)
                        ),
+                       
+                       # Select Gene List panel
+                       sidebarLayout(
+                         sidebarPanel(width = 12, id = "DESeqRun",
+                                      downloadButton(label = "Download Gene List to csv", outputId = "writeGeneList")
+                                      
+                         ),
+                         mainPanel(width = 0)
+                       ),
+                       
+                       
+                       
+                       
                       ),
                       column(9,
                              sidebarLayout(
                                sidebarPanel(width = 12, id = "DESeqRun",
                                 fluidRow(h3("Gene List"),
-                                DT::dataTableOutput("geneListDT")),               
+                                DT::dataTableOutput("geneListDT")),
+                                helpText("To filter the based on values type string 'lower Value ... Upper Value' into 
+                                         filter boxes after table, i.e to filter p value between 0 and 0.05 type 0 ... 0.5 into the p value filter")
                               ),
                               mainPanel(width = 0)
                                
@@ -253,6 +279,7 @@ server <- function(input, output, session) {
                              maFig = ggplotly(), volFig = ggplotly(), 
                              curGeneTab = data.frame()
                              )
+    
     
     #assignFactorsTab <- tibble(Gene_Count_tab = "Nothing Selected") # tibble ot store the assign factors table
     
@@ -385,6 +412,21 @@ server <- function(input, output, session) {
                        #                   choices = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)]),
                        #                   select = as.character(p[p$Factors == p$Factors[1],][2:ncol(p)])[1])
                      }
+                     
+                     # Populate the Gene table 
+                     if (length(reVals$analysisOb@GeneTables) >0){
+                       #browser()
+                       updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+                       reVals$curGeneTab <- reVals$analysisOb@GeneTables[[1]]@gnTbl
+                       gnTbDT <- reVals$curGeneTab
+                       gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
+
+                       output$geneListDT <- DT::renderDataTable(gnTbDT
+                                                                , server = TRUE,  rownames = T)
+
+
+                     }
+                       
                  })
     
     # Modal dialog box for writing a description ------------------------------------------------- #
@@ -1122,75 +1164,138 @@ server <- function(input, output, session) {
     
     # create new genelist
     observeEvent(input$createGeneList, {
+      # I apoligze for the state of this code!
       
+      # Check if using LFC result and there are LFC results present
       if (input$LFCGeneList && length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC) > 0){
         #browser()
         
-        if (input$convertGeneIDtoSym == "Ensembl"){
+        if (input$convertGeneIDtoSym == "Ensembl"){ 
           reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
           # Get the gene IDs
           
           ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
+          rownames(reVals$curGeneTab) <- ensId
           gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
           reVals$curGeneTab$`Gene Symbol` <- ""
           reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
           reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
-          output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
-                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
           
+          # Make a datatable object for rendering and reducing column width
+          # gnTbDT <- formatRound(datatable(reVals$curGeneTab), digits = 5, 
+          #                       columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])
+
         }
         else
         {
-        output$geneListDT <- DT::renderDataTable(as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
-                                                 , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+          reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
+          # gnTbDT <- formatRound(datatable(reVals$curGeneTab), digits = 5, 
+          #                       columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])
         }
       }
-      else if (length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res) > 0) {
+      else if (length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res) > 0) {# don't use LFC results'
         
-        if (input$convertGeneIDtoSym == "Ensembl"){
+        if (input$convertGeneIDtoSym == "Ensembl"){ # convert ensembl id to gene symbol
           reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res)
           # Get the gene IDs
           
           ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
+          rownames(reVals$curGeneTab) <- ensId
           gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
           reVals$curGeneTab$`Gene Symbol` <- ""
           reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
           reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
-          output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
-                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+
+          # Make a datatable object for rendering and reducing column width
+          # gnTbDT <- formatRound(datatable(reVals$curGeneTab), digits = 5, 
+          #                       columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])
           
         }
         else
         {
-          output$geneListDT <- DT::renderDataTable(as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res)
-                                                   , server = TRUE,  rownames = T, class = 'cell-border stripe', filter = 'top')
+          reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@res)
+          
         }
         
       }
       else {
         
+
         showModal(modalDialog(title = "warning", "No DESeq results found. Have you run 'Get DESeq2 Results' in the differential Analysis tab?"))
-        
+        reVals$curGeneTab <- data.frame("")
+        output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
+                                                 , server = TRUE,  rownames = T, filter = 'top')
+        return()
       }
+      #reVals$curGeneTab$Abs
       
+      #gnTbDT <- #formatRound(datatable(reVals$curGeneTab), digits = 5, 
+                 #           columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])      
+      
+      gnTbDT <- reVals$curGeneTab
+      gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
+      
+      output$geneListDT <- DT::renderDataTable(gnTbDT
+                                               , server = TRUE,  rownames = T, filter = 'top')
     })
     
-    # Create a gene list object
+    
+    
+    # Save a genelist to the workspace
     
     observeEvent(input$saveGeneList, {
       
       browser()
        # this is the command reVals$curGeneTab[input$geneListDT_rows_all,]
-      
-      # Check there's a table there
-      
-      
-      # Check for the name
-      
-      
-      # Write to the object
+     #tDt
+      # Check there's a table there, that there is a name and the name hasn't been used before
+      if (ncol(reVals$curGeneTab) > 1 && !(input$nameGenelist == "" && !(input$nameGenelist %in% names(reVals$analysisOb@GeneTables)))){
+        
+        tGnTbOb <- new("geneTableDA")
+        tGnTbOb <- addGeneTableDA(tGnTbOb, reVals$curGeneTab[input$geneListDT_rows_all,], input$selectDiffAnl, input$geneListDT_search_columns)
+        reVals$analysisOb <- addGeneTable(reVals$analysisOb, tGnTbOb, input$nameGenelist)
+        browser()
+        updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  input$nameGenelist)
+      } else if(ncol(reVals$curGeneTab) < 1)
+      {
+        
+        showModal(modalDialog(title = "Warning", "No Gene Table"))
+        
+      } else if (input$nameGenelist == "") {
+        
+        showModal(modalDialog(title = "Warning", "Please Give the gene list a name"))
+        
+      } else if (input$nameGenelist %in% names(reVals$analysisOb@GeneTables)) {
+        
+        showModal(modalDialog(title = "Warning", "Gene List Name has already been used")) 
+        
+      }
       
     })
+    
+    # Select Gene List using drop down
+    observeEvent(input$selectGeneTableGnTab, {
+      if (length(reVals$curGeneTab) > 0)
+      {
+        reVals$curGeneTab <- reVals$analysisOb@GeneTables[[input$selectGeneTableGnTab]]@gnTbl
+      gnTbDT <- reVals$curGeneTab
+      gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
+      
+      output$geneListDT <- DT::renderDataTable(gnTbDT, server = TRUE,  rownames = T)
+      }
+      
+    })
+
+       output$writeGeneList <- downloadHandler(
+        
+         filename = function() {
+           paste(input$selectGeneTableGnTab, ".csv", sep = "")
+         },
+         content = function(file) {
+           write.csv(reVals$curGeneTab, file, row.names = TRUE)
+         }
+       )
+
     
     
  

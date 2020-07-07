@@ -14,21 +14,22 @@
 library(dplyr)
 
 setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list",
-                                        NrmCnts = "list", NrmCntsExpSmp = "list", State = "data.frame"))
+                                        NrmCnts = "list", NrmCntsExpSmp = "list", GeneTables = "list", State = "data.frame"))
 # GeneCntTables contains the gene count tables for an experiment
 # factorsTab contains a list of the factors tables in the current analysis
 # ExpSmpTab contain a list of the experimental sample tables in the current analysis
 # NrmCnts contains normalized counts matrices objects (see ??)
 # NrmCntsExpSmp contains the ExpSmpTab tables from which the normalized counts were generated
+# Gene tables stores gene tables which from DESeq differential analysis, which are then filtered by the user
 # State stores the current state of the app so that it can be reloaded
 
-# Constructor (set the state of the )
+# Constructor (set the state of the objkect (which datasets were selected by the user when the app was last run so these can be restoerd upoin loading))
 setMethod(f = "initialize", signature = "RNASeqAnalysis",
           definition= function(.Object){
             
             #print("Constructing!")
-            .Object@State <- data.frame(selected = rep("0", 5), stringsAsFactors = F)
-            rownames(.Object@State) <- c("nrmCnts", "contrastFac", "contrastCond", "factorsTab", "expSmpTab")
+            .Object@State <- data.frame(selected = rep("0",6), stringsAsFactors = F)
+            rownames(.Object@State) <- c("nrmCnts", "contrastFac", "contrastCond", "factorsTab", "expSmpTab", "geneTable")
             
             return(.Object)
           })
@@ -190,3 +191,22 @@ setMethod(f="addNrmCntsDS",
 )
 
 # Remove deseq2 data
+
+# Add gene table
+setGeneric(name = "addGeneTable", 
+           def=function(object, gnTb, nm) {
+             
+             standardGeneric("addGeneTable")
+             
+           })
+
+setMethod(f = "addGeneTable", 
+          signature = "RNASeqAnalysis",
+          definition = function(object, gnTb, nm){
+            
+            object@GeneTables[[nm]] <- gnTb
+            return(object)
+            
+          })
+             
+           
