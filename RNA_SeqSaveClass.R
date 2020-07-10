@@ -14,7 +14,7 @@
 library(dplyr)
 
 setClass("RNASeqAnalysis", slots = list(GeneCntTables="list", GeneMeta = "data.frame", factorsTab = "list", ExpSmpTab = "list", ExpSmpFactorsTab = "list",
-                                        NrmCnts = "list", NrmCntsExpSmp = "list", GeneTables = "list", State = "data.frame"))
+                                        NrmCnts = "list", NrmCntsExpSmp = "list", GeneTables = "list", PthWyAnl = "list", State = "data.frame"))
 # GeneCntTables contains the gene count tables for an experiment
 # factorsTab contains a list of the factors tables in the current analysis
 # ExpSmpTab contain a list of the experimental sample tables in the current analysis
@@ -209,4 +209,19 @@ setMethod(f = "addGeneTable",
             
           })
              
-           
+# Add pthwya
+setGeneric(name = "addPthWyAnl", 
+           def=function(object, pthWy, nm) {
+             
+             standardGeneric("addPthWyAnl")
+             
+           })
+
+setMethod(f = "addPthWyAnl", 
+          signature = "RNASeqAnalysis",
+          definition = function(object, pthWy, nm){
+            
+            object@PthWyAnl[[nm]] <- pthWy
+            return(object)
+            
+          })           

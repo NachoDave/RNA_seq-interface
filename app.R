@@ -17,8 +17,11 @@ source("RNA_SeqSaveClass.R")
 source("analysisFunctions.R")
 source("nrmCntResults.R")
 source("plottingFunctions.R")
+source("geneTable.R")
+source("pathWaySave.R")
 options(shiny.maxRequestSize = 50*1024^2)
 library(EnsDb.Hsapiens.v86)
+library(WebGestaltR)
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
@@ -256,7 +259,87 @@ ui <- fluidPage(
                    ),
                    
                    
-                   tabPanel("Pathway Analysis"),
+                   tabPanel("Pathway Analysis", 
+                            column(2,
+                                   # Select Gene List panel
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                                  selectInput(label = "Select Gene List", inputId = "selectGOGnTb", choices = NULL)
+                                                  
+                                     ),
+                                     mainPanel(width = 0)
+                                   ),
+                                   
+                                   # Select GO method
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                        
+                                                  fluidRow(checkboxGroupInput(label = "Select GO Method(s)", inputId = "selectGOMethod", choices = c("GSEA", "ORA"))),
+                                                  fluidRow(selectInput(label = "Select Enrichment Metric for GSEA", inputId = "selectGSEAEnrich", choices = NULL))
+                                                  
+                                     ),
+                                     mainPanel(width = 0)
+                                   ),
+                                   
+
+                                   # Select GO process
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                                  
+                                                  checkboxGroupInput(label = "Select Analysis", inputId = "selectGODB", 
+                                                                     
+                                                                     choices = c("GO Molecular Function", "GO Cellular Component", "GO Biological Process", # GO 
+                                                                                 "KEGG Pathway", "Panther Pathway", 
+                                                                                 "Reactome Pathway")), # pathway
+                                                  
+                                     ),
+                                     mainPanel(width = 0)
+                                   ),
+                                   
+                                   # Select GO database
+                                   # sidebarLayout(
+                                   #   sidebarPanel(width = 12, id = "DESeqRun",
+                                   #                
+                                   #                checkboxGroupInput(label = "Select GO Database(s)", inputId = "selectGODB", choices = c("GO", "KEGG", "PANTHER")),
+                                   #                
+                                   #   ),
+                                   #   mainPanel(width = 0)
+                                   # ),
+                                   
+                                   # Run GO
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                                  
+                                                  checkboxInput(inputId = "saveGOChk", label = "Save Analysis Results"),
+                                                  fluidRow(shinyDirButton("dirGO", "Save Directory", "Upload"),
+                                                           verbatimTextOutput("dirGO", placeholder = TRUE)  
+                                                  ),
+                                                  textInput(inputId = "textSaveGO", label = "Name GO Analysis"), 
+                                                  actionButton(inputId = "runGO", label = "Run GO Analysis"),
+                                                  
+                                     ),
+                                     mainPanel(width = 0)
+                                   ),
+                            ),
+                            
+                            column(7),
+                            column(3,  sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqRun",
+                                           selectInput(label = "Select Pathway Analysis", inputId = "selectPthWy", choices = NULL),
+                                           actionButton(inputId = "Bar Plot", label = "Bar Plot")
+                                           
+                              ),
+                              mainPanel(width = 0)
+                            ),
+                                   
+                                   
+                                   
+                            )
+                            
+                   ),
+                   
+                   
+                   
                    tabPanel("")
                    
                ),
@@ -316,13 +399,14 @@ server <- function(input, output, session) {
     
     # Save analysis
     shinyDirChoose(
+    
         input,
         'dir',
         roots = c(home = "/data/RNASeqAnalysis"),
         #filetypes = c('', 'txt', 'bigWig', "tsv", "csv", "bw")
     )
-    
-    global <- reactiveValues(datapath = getwd())
+    #browser()
+    global <- reactiveValues(datapath = getwd(), datapathGO = getwd())
     
     dir <- reactive(input$dir)
     
@@ -417,6 +501,7 @@ server <- function(input, output, session) {
                      if (length(reVals$analysisOb@GeneTables) >0){
                        #browser()
                        updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+                       updateSelectInput(session, "selectGOGnTb", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]]) # update gene table on GO tab
                        reVals$curGeneTab <- reVals$analysisOb@GeneTables[[1]]@gnTbl
                        gnTbDT <- reVals$curGeneTab
                        gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
@@ -1168,7 +1253,7 @@ server <- function(input, output, session) {
       
       # Check if using LFC result and there are LFC results present
       if (input$LFCGeneList && length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC) > 0){
-        #browser()
+        browser()
         
         if (input$convertGeneIDtoSym == "Ensembl"){ 
           reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
@@ -1232,6 +1317,8 @@ server <- function(input, output, session) {
       #gnTbDT <- #formatRound(datatable(reVals$curGeneTab), digits = 5, 
                  #           columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])      
       
+      absFc <- abs(reVals$curGeneTab$log2FoldChange)
+      reVals$curGeneTab$'abs log2FoldChange' <- absFc
       gnTbDT <- reVals$curGeneTab
       gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
       
@@ -1256,6 +1343,7 @@ server <- function(input, output, session) {
         reVals$analysisOb <- addGeneTable(reVals$analysisOb, tGnTbOb, input$nameGenelist)
         browser()
         updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  input$nameGenelist)
+        updateSelectInput(session, "selectGOGnTb", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]]) # update gene table on GO tab
       } else if(ncol(reVals$curGeneTab) < 1)
       {
         
@@ -1296,10 +1384,104 @@ server <- function(input, output, session) {
          }
        )
 
-    
+    ###  GO Analysis tab =============================================================================================== ###
+       
+       # Save GO analysis ---------------------------------------------------------------------------------------------- ###
+       shinyDirChoose(
+         input,
+         'dirGO',
+         roots = c(home = "/data/RNASeqAnalysis"),
+         #filetypes = c('', 'txt', 'bigWig', "tsv", "csv", "bw")
+       )
+       
+       # global <- reactiveValues(datapathGO = getwd())
+       # 
+       dirGO <- reactive(input$dirGO)
+
+       output$dirGO <- renderText({
+         "Select Save Path"
+       })
+
+       observeEvent(ignoreNULL = TRUE,
+                    eventExpr = {
+                      input$dirGO
+                    },
+                    handlerExpr = {
+                      if (!"path" %in% names(dirGO())) return()
+                      home <- normalizePath("/data/RNASeqAnalysis")
+                      global$datapathGO <-
+                        file.path(home, paste(unlist(dirGO()$path[-1]), collapse = .Platform$file.sep))
+                      #print(global$datapath)
+                      output$dirGO <- renderText({
+                        global$datapathGO
+                      })
+                    })
+       # 
+       # Run GO
+       observeEvent(input$runGO, {
+         
+         
+         if (is.null(input$selectGODB)){
+           
+           showModal(modalDialog(title = "Warning", "No Database selected"))
+          return()  
+         }
+         if (is.null(input$selectGOMethod)){
+           
+           showModal(modalDialog(title = "Warning", "No Analysis Method selected"))
+           return()  
+         }         
+         if (input$textSaveGO == ""){
+           
+           showModal(modalDialog(title = "Warning", "Please name your GO analysis"))
+           return() 
+           
+         }
+         if (input$dirGO == "" ){
+           
+           showModal(modalDialog(title = "Warning", "Please set path for output directory"))
+           return()            
+           
+         }
+         
+         # Find ID type from gene table
+         gns <- data.frame(rownames(reVals$analysisOb@GeneTables[[input$selectGOGnTb]]@gnTbl),
+                  reVals$analysisOb@GeneTables[[input$selectGeneTableGnTab]]@gnTbl[[input$selectGSEAEnrich]])
+         colnames(gns) <- c("ID", "input$selectGSEAEnrich")
+         
+         x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
+                             global$datapathGO, input$textSaveGO, gns, "ensembl_gene_id", input$saveGOChk, 
+                             input$selectGOGnTb)
+         
+         # Check if there was an error
+         browser()
+         if (any(class(x) == "error")){
+           
+           showModal(modalDialog(title = "WebGStalt Error", x$message))
+           
+         } else
+         {
+           
+           reVals$analysisOb <- x
+           updateSelectInput(session, "selectPthWy", choices = names(reVals$analysisOb@PthWyAnl))
+         }
+         
+       }
+       )
+       
+       observeEvent(input$selectGOGnTb, {
+         
+         
+         if (length(reVals$analysisOb@GeneTables) > 0)
+         {
+           #browser()
+           tMet <- colnames(reVals$analysisOb@GeneTables[[input$selectGOGnTb]]@gnTbl)
+           updateSelectInput(session, inputId = "selectGSEAEnrich", 
+                           choices = tMet, selected = tMet[length(tMet)])
+           }
+       })
     
  
 }
-
 # Run the application 
 shinyApp(ui = ui, server = server)

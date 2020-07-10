@@ -2,7 +2,7 @@
 library(DESeq2)
 source("RNA_SeqSaveClass.R")
 source("nrmCntResults.R")
-
+source("pathWaySave.R")
 # Function to normalize counts using DESeq2 
 deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
   
@@ -125,4 +125,85 @@ deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE, lfcMethod = "apeglm
   )
   
   
+}
+
+# Use webGesalt for pathway analysis
+runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnTb){
+  tryCatch(
+    {
+      #browser()
+
+     for (dbdx in db){
+       for (mthdx in enrichMeth){
+        
+        #browser()
+          
+         refSet = "genome"
+         minN = 5
+         maxN = 2000
+         topThr = 25 # number of results to report
+         
+
+         if (mthdx == "ORA"){
+           tGns <- as.vector(gns[, 1])
+         } else {
+           tGns <- gns
+         }
+
+         # "GO Molecular Function", "GO Cellular Component", "GO Biological Process", # GO 
+         # "KEGG Pathway", "Panther Pathway", 
+         # "Reactome Pathway"
+         
+         if (dbdx == "GO Molecular Function"){
+           enDb<- "geneontology_Molecular_Function"
+         }
+         else if(dbdx == "GO Cellular Component"){
+           enDb<- "geneontology_Cellular_Component"
+         }
+         else if (dbdx == "GO Biological Process"){
+           enDb<- "geneontology_Biological_Process"
+         }
+         else if (dbdx == "KEGG Pathway"){
+           enDb<- "pathway_KEGG"
+         }
+         else if (dbdx == "Panther Pathway"){
+           enDb<- "pathway_Panther"
+         }
+         else if (dbdx == "Reactome Pathway"){
+           enDb<- "pathway_Reactome"
+         }
+         
+         prjNm <- paste(nm, enDb, mthdx, sep = "_")
+          # Overlap tissue with cell =====================================================================================#
+          x <- WebGestaltR(enrichMethod=mthdx, 
+                                    organism="hsapiens",
+                                    enrichDatabase=enDb, 
+                                    interestGene = tGns,
+                                     interestGeneType=idType, # gene id type 
+                                     referenceSet = refSet,
+                                     outputDirectory=pth, 
+                                    projectName=prjNm,
+                                    isOutput=output, 
+                                    sigMethod='top',
+                                     minNum=minN,
+                                    topThr = topThr
+          ) # overlapping tissue, biological process
+        assign(prjNm, x)
+        #browser()
+        xx <- new("webGStalt_Analysis")
+        xx <- newPthWyAnl(xx, x, gnTb, mthdx, enDb)
+        
+        ob <- addPthWyAnl(ob, xx, prjNm)
+        
+        
+      } # loop 1
+    } # loop 2
+
+      return(ob)
+    }, # trycatch
+  error = function(e){
+    #browser()
+    e$message <- paste("WebGStalt error: ", e$message, "for", prjNm, ". Try rerunning and removing this analysis", sep = " ")
+    return(e)}
+  )
 }
