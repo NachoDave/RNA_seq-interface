@@ -82,7 +82,7 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
 # Make DESeq2 results
 
 deseq2DA <- function(ob, nrmCnts, cntrstRef, cntrstCnd){
-  browser()
+  #browser()
   
   ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]] <- relevel(ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]], ref = cntrstCnd)
   ob@NrmCnts[[nrmCnts]]@dds <- DESeq(ob@NrmCnts[[nrmCnts]]@dds)
@@ -175,13 +175,14 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
          
          prjNm <- paste(nm, enDb, mthdx, sep = "_")
           # Overlap tissue with cell =====================================================================================#
-          x <- WebGestaltR(enrichMethod=mthdx, 
+        # browser() 
+         x <- WebGestaltR(enrichMethod=mthdx, 
                                     organism="hsapiens",
                                     enrichDatabase=enDb, 
                                     interestGene = tGns,
                                      interestGeneType=idType, # gene id type 
                                      referenceSet = refSet,
-                                     outputDirectory=pth, 
+                                     #outputDirectory=pth, 
                                     projectName=prjNm,
                                     isOutput=output, 
                                     sigMethod='top',

@@ -1,6 +1,8 @@
 
 library(ggplot2)
 library(plotly)
+library("pheatmap")
+library("RColorBrewer")
 
 maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   #browser()
@@ -32,7 +34,7 @@ maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
 
 
   # 
-  fig <- ggplotly(plt, tooltip = c("text", "baseMean", "log2FoldChange")) %>% config(displaylogo = FALSE,
+  fig <- ggplotly(plt, tooltip = c("text", "baseMean", "log2FoldChange"), source = "A") %>% config(displaylogo = FALSE,
                                                                                      modeBarButtonsToRemove = list(
                                                                                        'sendDataToCloud',
                                                                                        'pan2d',
@@ -47,7 +49,7 @@ maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
                                                                                        'zoomIn2d',
                                                                                        'zoomOut2d',
                                                                                        'toggleSpikelines'
-                                                                                     ))
+                                                                                     )) %>% event_register("plotly_click")
   
   return(fig) 
   
@@ -89,7 +91,7 @@ volplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   
   
   # 
-  fig <- ggplotly(plt, tooltip = c("text", "baseMean", "log2FoldChange")) %>% config(displaylogo = FALSE,
+  fig <- ggplotly(plt, tooltip = c("text", "baseMean", "log2FoldChange"),  source = "B") %>% config(displaylogo = FALSE,
                                                                                      modeBarButtonsToRemove = list(
                                                                                        'sendDataToCloud',
                                                                                        'pan2d',
@@ -104,7 +106,74 @@ volplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
                                                                                        'zoomIn2d',
                                                                                        'zoomOut2d',
                                                                                        'toggleSpikelines'
-                                                                                     ))
+                                                                                     )) %>% event_register("plotly_click")
+  
+  return(fig)
+  
+}
+
+plotPthWybar <- function(pthWy){
+  
+  #browser()
+  df <- pthWy@pthWyAnl
+  #df <- df[order(df$enrichmentRatio, decreasing = T), ]
+  df$p0p05 <- "FDR > 0.05"
+  df$p0p05[df$FDR <= 0.05] <- "FDR < 0.05"
+  p <- ggplot(df, aes(x = description, y = enrichmentRatio,  text = paste("Enrichment:", enrichmentRatio, "P Val:", pValue,"Genes:", userId))) +
+    geom_col(colour = "black", aes(fill = p0p05), width = 0.7 ) + coord_flip() + 
+    labs(fill = "", x = "", y = "Enrichment Ratio" , title = paste("Gene Table:", pthWy@geneTable), subtitle = paste("DB:", pthWy@db, "Method:", pthWy@method))
+             #ggtitle(paste("Gene Tab:", pthWy@geneTable, "\nDB:", pthWy@db, "Method:", pthWy@method))
+  
+  fig <- ggplotly(p, tooltip = c( "text"),  source = "C") %>% config(displaylogo = FALSE,
+                                                                                                    modeBarButtonsToRemove = list(
+                                                                                                      'sendDataToCloud',
+                                                                                                      'pan2d',
+                                                                                                      'autoScale2d',
+                                                                                                      #'resetScale2d',
+                                                                                                      'hoverClosestCartesian',
+                                                                                                      'hoverCompareCartesian', 
+                                                                                                      'select2d',
+                                                                                                      'lasso2d',
+                                                                                                      'drawline',
+                                                                                                      'toggleSpikelines ',
+                                                                                                      'zoomIn2d',
+                                                                                                      'zoomOut2d',
+                                                                                                      'toggleSpikelines'
+                                                                                                    )) %>% event_register("plotly_click") %>%
+    layout(title = list(text = paste0(paste("Gene Tab:", pthWy@geneTable),
+                                      '<br>',
+                                      '<sup>',
+                                      paste("DB:", pthWy@db, "Method:", pthWy@method),
+                                      '</sup>')))
+  return(fig)
+}
+
+
+# Sample distance plot
+pltSmpDist <- function(cntMat, trnsFrm){
+  
+  if (trnsFrm == "vst"){
+    trnDt <- vst(cntMat@dds, blind = F)
+  } 
+  else if (trnsFrm == "rlog"){
+    trnDt <- rlog(cntMat@dds, blind = F)
+    
+  }
+  else {
+    trnDt <- cntMat@dds
+    
+  }
+
+  dst <- dist(t(assay(trnDt)))
+    
+  sampleDistMatrix <- as.matrix(dst)
+  rownames(sampleDistMatrix) <- colnames(cntMat@dds)
+  colnames(sampleDistMatrix) <- colnames(cntMat@dds)
+  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  fig <- pheatmap(sampleDistMatrix,
+           clustering_distance_rows=dst,
+           clustering_distance_cols=dst,
+           col=colors)
   
   return(fig)
   

@@ -6,7 +6,8 @@
 #
 #    http://shiny.rstudio.com/
 #
-
+library(BiocManager)
+options(repos = BiocManager::repositories())
 library(shiny)
 library(shinyFiles)
 library(DT)
@@ -42,14 +43,15 @@ ui <- fluidPage(
         column(3, style = "background-color:lightblue;", 
                fluidRow(h4("Analysis Options")),
                fluidRow(actionButton("newAnalysisactBut","Start New Analysis")),
-               fluidRow(fileInput(label = "Load Analysis", inputId = "loadAnalysis")),
-               fluidRow(h4('Save Analysis')),
-               fluidRow(shinyDirButton("dir", "Select Save Directory", "Upload"),
-                        verbatimTextOutput("dir", placeholder = TRUE)  
-               ),
-               
-               fluidRow(textInput(label = "Save Analysis Filename", inputId = "saveFn")),
-               fluidRow(actionButton("saveAnalysis", "Save Analysis")),
+               fluidRow(fileInput(label = "Load WorkSpace", inputId = "loadAnalysis")),
+               fluidRow(h4('Download Workspace')),
+               # fluidRow(shinyDirButton("dir", "Select Save Directory", "Upload"),
+               #          verbatimTextOutput("dir", placeholder = TRUE)  
+               # ),
+               # 
+               fluidRow(textInput(label = "Workspace Filename", inputId = "saveFn")),
+               #fluidRow(actionButton("saveAnalysis", "Save Work space")),
+               downloadButton(label = "Download Workspace", outputId = "dwnLdWrkSpc"),
                #fluidRow(tableOutput("cntTables"))
                fluidRow(fileInput(label = "Load Gene Count table", inputId = "loadCntTab")),
 
@@ -94,7 +96,7 @@ ui <- fluidPage(
                                 h4('Factors (double click on table cell to fill in, put control factors in level 1)'),
                                 DT::dataTableOutput('factors'),
                                 ),
-                            fluidRow(actionButton(label = "Update", inputId = "updateFactors")
+                            fluidRow(actionButton(label = "Add Factors to Workspace", inputId = "updateFactors")
                                      ),
                             
                             fluidRow(
@@ -113,8 +115,8 @@ ui <- fluidPage(
                             fluidRow(
                                 
                                 actionButton("newExpSmpTab", "New Sample Exp table"), # start a new assign factors table
-                                actionButton("saveExpSmpTab", "Save Sample Exp table"),
-                                actionButton("rmExpSmpTab", "Remove Sample Exp table")
+                                actionButton("saveExpSmpTab", "Add Sample table to workspace"),
+                                actionButton("rmExpSmpTab", "Remove Sample table from workspace")
                                 
                             )
                             ),
@@ -141,7 +143,36 @@ ui <- fluidPage(
                             ),                        
                    
                    ## Data Exploration tab panel ---------------------------------------------------------------------------## 
-                   tabPanel("Data Exploration"),
+                   tabPanel("Data Exploration", column(2,
+                                                       sidebarLayout(
+                                                         sidebarPanel(width = 12, id = "DESeqRun",
+                                                                      fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsExp", choices = NULL)),
+                                                                      fluidRow(radioButtons(inputId = "expDtTrn", label = "Data Transform", choices = c("None", "vst", "rlog"))),
+                                                                      fluidRow(actionButton(label = "PCA",inputId =  "pca")),
+                                                                      fluidRow(actionButton(label = "Sample Distance",inputId =  "smpDist")),
+                                                                      fluidRow(actionButton(label = "Heat Map",inputId =  "htMp")),
+                                                                      
+                                                         ),
+                                                         mainPanel(width = 0)
+                                                         
+                                                         
+                                                       ),
+                   ),
+                   column(5,
+                          h3("PCA"),
+                          fluidRow(plotlyOutput("PCAPlt")),
+                          h3("Sample Distance"),
+                          fluidRow(plotOutput("smpDstPlt")),
+                          
+                   ),
+                   
+                   column(5, 
+                          
+                          h3("Gene Counts"),
+                          fluidRow(plotlyOutput("GnCntPlt")),
+                          
+                   )
+                   ),
                    
                    ## Differential Analysis tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Differential Analysis", # Check overlaps
@@ -322,11 +353,14 @@ ui <- fluidPage(
                                    ),
                             ),
                             
-                            column(7),
+                            column(7, fluidRow(h3("Pathway Analysis"),
+                                               plotlyOutput("pthWyPlt")),
+                                   fluidRow( uiOutput("pthWyUrl"), #textOutput("pthWyTxt"), 
+                                             DT::dataTableOutput("pthWyTb")),),
                             column(3,  sidebarLayout(
                               sidebarPanel(width = 12, id = "DESeqRun",
                                            selectInput(label = "Select Pathway Analysis", inputId = "selectPthWy", choices = NULL),
-                                           actionButton(inputId = "Bar Plot", label = "Bar Plot")
+                                           actionButton(inputId = "pthWyBarPlot", label = "Bar Plot")
                                            
                               ),
                               mainPanel(width = 0)
@@ -397,47 +431,67 @@ server <- function(input, output, session) {
         
     })
     
-    # Save analysis
-    shinyDirChoose(
-    
-        input,
-        'dir',
-        roots = c(home = "/data/RNASeqAnalysis"),
-        #filetypes = c('', 'txt', 'bigWig', "tsv", "csv", "bw")
-    )
-    #browser()
-    global <- reactiveValues(datapath = getwd(), datapathGO = getwd())
-    
-    dir <- reactive(input$dir)
-    
-    output$dir <- renderText({
-        "Select Save Path"
-    })
-    
-    observeEvent(ignoreNULL = TRUE,
-                 eventExpr = {
-                     input$dir
-                 },
-                 handlerExpr = {
-                     if (!"path" %in% names(dir())) return()
-                     home <- normalizePath("/data/RNASeqAnalysis")
-                     global$datapath <-
-                         file.path(home, paste(unlist(dir()$path[-1]), collapse = .Platform$file.sep))
-                     #print(global$datapath)
-                     output$dir <- renderText({
-                         global$datapath
-                     })
-                 })
+    # Save analysis = for saving to server
+    # shinyDirChoose(
+    # 
+    #     input,
+    #     'dir',
+    #     roots = c(home = "/data/RNASeqAnalysis"),
+    #     #filetypes = c('', 'txt', 'bigWig', "tsv", "csv", "bw")
+    # )
+    # #browser()
+    # global <- reactiveValues(datapath = getwd(), datapathGO = getwd())
+    # 
+    # dir <- reactive(input$dir)
+    # 
+    # output$dir <- renderText({
+    #     "Select Save Path"
+    # })
+    # 
+    # observeEvent(ignoreNULL = TRUE,
+    #              eventExpr = {
+    #                  input$dir
+    #              },
+    #              handlerExpr = {
+    #                  if (!"path" %in% names(dir())) return()
+    #                  home <- normalizePath("/data/RNASeqAnalysis")
+    #                  global$datapath <-
+    #                      file.path(home, paste(unlist(dir()$path[-1]), collapse = .Platform$file.sep))
+    #                  #print(global$datapath)
+    #                  output$dir <- renderText({
+    #                      global$datapath
+    #                  })
+    #              })
 
     # Save the analysis
-    observeEvent(input$saveAnalysis, {
+    # observeEvent(input$saveAnalysis, {
+    #     #browser()
+    #     # saveReVals <- reVals$analysisOb
+    #     # 
+    #     # if (input$saveFn == ""){save(saveReVals, file = paste0(global$datapath, "/", "RNASeqAnalysis.rData"))}
+    #     # else {save(saveReVals, file = paste0(global$datapath, "/",input$saveFn, ".rData"))}
+    # 
+    # })
+    
+    output$dwnLdWrkSpc <- downloadHandler(
+      
+      filename = function() {
+        if (input$saveFn == ""){
+          fn <- "RNASeqAnalysis"
+        }
+          else
+          {
+            fn <- input$saveFn
+          }
+        
+        paste(fn, ".rData", sep = "")
+      },
+      content = function(file) {
         #browser()
         saveReVals <- reVals$analysisOb
-        
-        if (input$saveFn == ""){save(saveReVals, file = paste0(global$datapath, "/", "RNASeqAnalysis.rData"))}
-        else {save(saveReVals, file = paste0(global$datapath, "/",input$saveFn, ".rData"))}
-
-    })
+        save(saveReVals, file = file)
+      }
+    )
     
     # load analysis
     observeEvent(input$loadAnalysis,
@@ -484,6 +538,7 @@ server <- function(input, output, session) {
                      # Populate drop downs
                      if (length(reVals$analysisOb@NrmCnts) > 0){
                      updateSelectInput(session, "selectNrmCntsDiff", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
+                       updateSelectInput(session, "selectNrmCntsExp", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
                        # p = reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[reVals$analysisOb@NrmCnts[[1]]@ExpSampNm]]]]  # this is evil
                        # # 
                        # updateSelectInput(session, "selectNrmCntsCntrst",
@@ -511,6 +566,13 @@ server <- function(input, output, session) {
 
 
                      }
+                     #browser()
+                     if (length(reVals$analysisOb@PthWyAnl) > 0 )
+                     {
+                        # browser()
+                       tMet <- names(reVals$analysisOb@PthWyAnl)
+                     updateSelectInput(session, inputId = "selectPthWy", 
+                                       choices = tMet)}
                        
                  })
     
@@ -936,6 +998,7 @@ server <- function(input, output, session) {
           
           #update normalised counts to select drop down
           updateSelectInput(session, "selectNrmCntsDiff", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
+          updateSelectInput(session, "selectNrmCntsExp", choices = names(reVals$analysisOb@NrmCnts), selected = names(reVals$analysisOb@NrmCnts)[[1]])
           #browser()
           # p = reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[reVals$analysisOb@NrmCnts[[1]]@ExpSampNm]]]]  # this is evil
           # # 
@@ -958,6 +1021,16 @@ server <- function(input, output, session) {
       
       
     })
+    
+    ## Data Exploration tab ========================================================================================== ###
+    observeEvent(input$smpDist, {
+      #browser()
+      nt <- showNotification("Making Distance heatmap", duration = NULL)
+      fig <- pltSmpDist(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
+      output$smpDstPlt <- renderPlot(fig)
+      removeNotification(nt)
+    })
+    
     
     ## Differential tab ============================================================================================== ###
      # update normalised counts to select drop down
@@ -1017,7 +1090,7 @@ server <- function(input, output, session) {
     observeEvent(input$runDESeq2, {
     
       if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
-        browser()
+        #browser()
         nt <- showNotification("DESeq2 Running", duration = NULL)
       reVals$analysisOb <- deseq2DA(reVals$analysisOb, input$selectNrmCntsDiff, input$selectNrmCntsCntrst, input$selectNrmCntsCnd)
         removeNotification(nt)
@@ -1253,7 +1326,7 @@ server <- function(input, output, session) {
       
       # Check if using LFC result and there are LFC results present
       if (input$LFCGeneList && length(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC) > 0){
-        browser()
+        #browser()
         
         if (input$convertGeneIDtoSym == "Ensembl"){ 
           reVals$curGeneTab <- as.data.frame(reVals$analysisOb@NrmCnts[[input$selectDiffAnl]]@resLFC)
@@ -1317,8 +1390,10 @@ server <- function(input, output, session) {
       #gnTbDT <- #formatRound(datatable(reVals$curGeneTab), digits = 5, 
                  #           columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])      
       
-      absFc <- abs(reVals$curGeneTab$log2FoldChange)
-      reVals$curGeneTab$'abs log2FoldChange' <- absFc
+      # absFc <- abs(reVals$curGeneTab$log2FoldChange)
+      # reVals$curGeneTab$'abs log2FoldChange' <- absFc
+      #browser()
+      #reVals$curGeneTab <- reVals$curGeneTab[, c(1, 2,3, 5, 6)]
       gnTbDT <- reVals$curGeneTab
       gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
       
@@ -1332,7 +1407,7 @@ server <- function(input, output, session) {
     
     observeEvent(input$saveGeneList, {
       
-      browser()
+      #browser()
        # this is the command reVals$curGeneTab[input$geneListDT_rows_all,]
      #tDt
       # Check there's a table there, that there is a name and the name hasn't been used before
@@ -1341,7 +1416,7 @@ server <- function(input, output, session) {
         tGnTbOb <- new("geneTableDA")
         tGnTbOb <- addGeneTableDA(tGnTbOb, reVals$curGeneTab[input$geneListDT_rows_all,], input$selectDiffAnl, input$geneListDT_search_columns)
         reVals$analysisOb <- addGeneTable(reVals$analysisOb, tGnTbOb, input$nameGenelist)
-        browser()
+        #browser()
         updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  input$nameGenelist)
         updateSelectInput(session, "selectGOGnTb", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]]) # update gene table on GO tab
       } else if(ncol(reVals$curGeneTab) < 1)
@@ -1437,24 +1512,29 @@ server <- function(input, output, session) {
            return() 
            
          }
-         if (input$dirGO == "" ){
-           
-           showModal(modalDialog(title = "Warning", "Please set path for output directory"))
-           return()            
-           
-         }
-         
+         # if (input$dirGO == "" ){
+         #   
+         #   showModal(modalDialog(title = "Warning", "Please set path for output directory"))
+         #   return()            
+         #   
+         # }
+         # 
          # Find ID type from gene table
+         
+         nt <- showNotification("Pathway Analysis Running", duration = NULL)
          gns <- data.frame(rownames(reVals$analysisOb@GeneTables[[input$selectGOGnTb]]@gnTbl),
                   reVals$analysisOb@GeneTables[[input$selectGeneTableGnTab]]@gnTbl[[input$selectGSEAEnrich]])
          colnames(gns) <- c("ID", "input$selectGSEAEnrich")
          
+         # x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
+         #                     global$datapathGO, input$textSaveGO, gns, "ensembl_gene_id", input$saveGOChk, 
+         #                     input$selectGOGnTb)
          x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
-                             global$datapathGO, input$textSaveGO, gns, "ensembl_gene_id", input$saveGOChk, 
+                             "None", input$textSaveGO, gns, "ensembl_gene_id", FALSE, 
                              input$selectGOGnTb)
-         
+         removeNotification(nt)
          # Check if there was an error
-         browser()
+         #browser()
          if (any(class(x) == "error")){
            
            showModal(modalDialog(title = "WebGStalt Error", x$message))
@@ -1470,8 +1550,7 @@ server <- function(input, output, session) {
        )
        
        observeEvent(input$selectGOGnTb, {
-         
-         
+
          if (length(reVals$analysisOb@GeneTables) > 0)
          {
            #browser()
@@ -1481,7 +1560,45 @@ server <- function(input, output, session) {
            }
        })
     
- 
+       # Plot a bar chart of pathway analysis
+       observeEvent(input$pthWyBarPlot, {
+         
+        #browser()
+         plt <- plotPthWybar(reVals$analysisOb@PthWyAnl[[input$selectPthWy]])
+         #browser()
+         output$pthWyPlt <- renderPlotly(plt)
+       })
+       
+       # observeEvent(event_data("plotly_click", source = "A"), 
+       #              {
+       #                browser()
+       #              })
+
+       observeEvent(event_data("plotly_click", source = "C"), 
+                    {
+                      # output$pthWyPlt
+                      #
+                      #browser()
+                      dx <- event_data("plotly_click", source = "C")$pointNumber + 1
+                      g <- data.frame(strsplit(reVals$analysisOb@PthWyAnl[[input$selectPthWy]]@pthWyAnl$userId[[dx]], split = ";", fixed = T)[[1]])
+                      colnames(g) <- c("Gene ID")
+                      
+                      if (grep("ENSG", g$`Gene ID`[[1]])){
+                        
+                        
+                        gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = as.character(g$`Gene ID`), keytype = "GENEID", columns = c("SYMBOL"))
+                        g$`Gene Symbol` <- gnSym$SYMBOL
+                      }
+                      
+                      output$pthWyTb <- DT::renderDataTable(g, server = TRUE,  rownames = T)
+                      url1 <- a(reVals$analysisOb@PthWyAnl[[input$selectPthWy]]@pthWyAnl$geneSet[[dx]] , 
+                                        href = reVals$analysisOb@PthWyAnl[[input$selectPthWy]]@pthWyAnl$link[[dx]])
+                      output$pthWyUrl <- renderUI({
+                        tagList("URL link:", url1)
+                      })
+                      # output$pthWyTxt <- renderText(paste(
+                      #                          reVals$analysisOb@PthWyAnl[[input$selectPthWy]]@pthWyAnl$link[[dx]]))
+                    })
 }
 # Run the application 
 shinyApp(ui = ui, server = server)
