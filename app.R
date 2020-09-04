@@ -23,6 +23,9 @@ source("pathWaySave.R")
 options(shiny.maxRequestSize = 50*1024^2)
 library(EnsDb.Hsapiens.v86)
 library(WebGestaltR)
+library(apeglm)
+library(ashr)
+#library()
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   
@@ -31,6 +34,7 @@ ui <- fluidPage(
     HTML('
          #DESeqRun, #DESeqGetRes {
             border: 1px solid black;
+            background-color:LightCyan;
         }
         body, label, input, button, select { 
           font-family: "Arial";
@@ -41,31 +45,51 @@ ui <- fluidPage(
     fluidRow(
         # Left menu shwing analysis and loaded files
         column(3, style = "background-color:lightblue;", 
-               fluidRow(h4("Analysis Options")),
-               fluidRow(actionButton("newAnalysisactBut","Start New Analysis")),
-               fluidRow(fileInput(label = "Load WorkSpace", inputId = "loadAnalysis")),
-               fluidRow(h4('Download Workspace')),
-               # fluidRow(shinyDirButton("dir", "Select Save Directory", "Upload"),
-               #          verbatimTextOutput("dir", placeholder = TRUE)  
-               # ),
-               # 
-               fluidRow(textInput(label = "Workspace Filename", inputId = "saveFn")),
-               #fluidRow(actionButton("saveAnalysis", "Save Work space")),
-               downloadButton(label = "Download Workspace", outputId = "dwnLdWrkSpc"),
-               #fluidRow(tableOutput("cntTables"))
-               fluidRow(fileInput(label = "Load Gene Count table", inputId = "loadCntTab")),
-
-               # table showing count data
-               fluidRow(h4("Loaded Gene Count tables")),
-               #fluidRow(DTOutput("genCntTbl")),
-               fluidRow(
-                   
-                   
-                   DT::dataTableOutput('genCntTabTab'),
-                   #verbatimTextOutput('y12')
+              # fluidRow(h4("Data and Workspace")),
+               
+               sidebarLayout(
+                 sidebarPanel(width = 12, id = "DESeqRun",
+                              fluidRow(h3('Load and Save Workspace')),
+                              #fluidRow(actionButton("newAnalysisactBut","Start New Analysis")),
+                              fluidRow(fileInput(label = "Load WorkSpace", inputId = "loadAnalysis")),
+                              fluidRow(h4('Download Workspace')),
+                              # fluidRow(shinyDirButton("dir", "Select Save Directory", "Upload"),
+                              #          verbatimTextOutput("dir", placeholder = TRUE)  
+                              # ),
+                              # 
+                              fluidRow(textInput(label = "Workspace Filename", inputId = "saveFn")),
+                              #fluidRow(actionButton("saveAnalysis", "Save Work space")),
+                              downloadButton(label = "Save Workspace", outputId = "dwnLdWrkSpc"),
+                              #fluidRow(tableOutput("cntTables"))
+       
+                              
+                 ),
+                 mainPanel(width = 0)
                ),
-               fluidRow(actionButton("removeGnCnt", "Remove Gene Count Table")),
-               #fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
+               
+               
+               sidebarLayout(
+                 sidebarPanel(width = 12, id = "DESeqRun",
+                              fluidRow(h3('Input Data')),
+                              fluidRow(fileInput(label = "Load Gene Count table", inputId = "loadCntTab")),
+                              
+                              # table showing count data
+                              fluidRow(h4("Loaded Gene Count tables")),
+                              #fluidRow(DTOutput("genCntTbl")),
+                              fluidRow(
+                                
+                                
+                                DT::dataTableOutput('genCntTabTab'),
+                                #verbatimTextOutput('y12')
+                              ),
+                              fluidRow(actionButton("removeGnCnt", "Remove Gene Counts")),
+                              #fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
+                              
+                 ),
+                 mainPanel(width = 0)
+               ),
+               
+    
               
 
         )
@@ -80,65 +104,114 @@ ui <- fluidPage(
                    
                    ## Factors tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Factors",
-                            column(1),
-                            column(11,
-                            fluidRow(
+                            #column(1),
+                            #column(11,
+                           # fluidRow(
+                           sidebarLayout(
+                             sidebarPanel(width = 12, id = "DESeqRun",
+                                          fluidRow(h3('Create Factors Table')),
+                                          fluidRow(
+                                            actionButton(label = "New factors table", inputId = "newFacTab", icon = icon("plus")),
+                                            actionButton(label = "Remove factors table", inputId = "rmFacTab", icon = icon("minus"))
+                                            
+                                          ), 
+                                          fluidRow(
+                                            h4('Factors (double click on table cell to enter factors and levels)'),
+                                            DT::dataTableOutput('factors'),
+                                          ),
+                                          
+                                          
+                                          fluidRow(
+                                            actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
+                                            actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
+                                            actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
+                                            actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
+                                          ),
+                                          fluidRow(actionButton(label = "Add Factors to Workspace", inputId = "updateFactors")
+                                          ),
+                                          
+                             ),
+                             mainPanel(width = 0)
+                           ),
 
-                                selectInput(label = "Choose Factors List", inputId = "selectFacTab", choices = NULL)
-                                
-                                ), 
-                            fluidRow(
-                                actionButton(label = "New factors table", inputId = "newFacTab", icon = icon("plus")),
-                                actionButton(label = "Remove factors table", inputId = "rmFacTab", icon = icon("minus"))
-
-                            ), 
-                            fluidRow(
-                                h4('Factors (double click on table cell to fill in, put control factors in level 1)'),
-                                DT::dataTableOutput('factors'),
-                                ),
-                            fluidRow(actionButton(label = "Add Factors to Workspace", inputId = "updateFactors")
-                                     ),
+                           sidebarLayout(
+                             sidebarPanel(width = 12, id = "DESeqRun",
+                                          fluidRow(h3('Create Experiment Sample Table'),
+                                          selectInput(label = "1. Select Factors Table", inputId = "selectFacTab", choices = NULL),
+                                          ),
+                                           
+                                          fluidRow(h5(strong('2. Select Samples you want to analyse from the loaded Gene Count tables (in left panel)'))),
+                                          fluidRow(h5(strong('3. Create a new Experiment sample table'))),
+                                          fluidRow(actionButton("newExpSmpTab", "New Sample Exp table")), # start a new assign factors table
+                                          fluidRow(
+                                            
+                                            textInput("nameExpSamTab", "4. Give your experiment sample table a name", placeholder = "Experiment name"),
+                                            
+                                            DT::dataTableOutput('assignfactors'),
+                                            
+                                          ),
+                                          
+                                            
+                                            fluidRow(h5(strong('5. Add Experiment sample to workspace'))),
+                                          fluidRow(actionButton("saveExpSmpTab", "Add Sample table to workspace"),
+                                            
+                                            
+                                          ),
+                                          
+                                          fluidRow(selectInput(inputId = "selectExpSmp", label = "Select Experiment sample table (view tables created)", choices = NULL),
+                                                   actionButton("rmExpSmpTab", "Remove Sample table from workspace"))
+                                          
+                             ),
+                             mainPanel(width = 0)
+                           ),
                             
-                            fluidRow(
-                                actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
-                                actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
-                                actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
-                                actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
-                                     ),
-                            fluidRow(
-                                h4('Experiment sample table'),
-                                textInput("nameExpSamTab", "Experiment Sample table name", placeholder = "Experiment name"),
-                                selectInput(inputId = "selectExpSmp", label = "Select Experiment sample table", choices = NULL),
-                                DT::dataTableOutput('assignfactors'),
-                                
-                            ),
-                            fluidRow(
-                                
-                                actionButton("newExpSmpTab", "New Sample Exp table"), # start a new assign factors table
-                                actionButton("saveExpSmpTab", "Add Sample table to workspace"),
-                                actionButton("rmExpSmpTab", "Remove Sample table from workspace")
-                                
-                            )
-                            ),
+                           
+                            #),
                    ),
                    ## Normalization tab panel ---------------------------------------------------------------------------## 
-                   tabPanel("Normalization", column(1),
-                            column(11,
-                            h3("Normalization using DESeq2 median of ratios (we will add other methods if needed)"),
-                            fluidRow(textInput("nrmedCntsName", "Name normed counts"),
-                                     h4("Select Design Factors"),
-                                     DT::dataTableOutput("selectDesignFactors")),
-                            fluidRow(
-                            selectInput(inputId = "selectExpSmpNrm", label = "Select Experiment sample table for normalization", choices = NULL),
-                            numericInput(inputId = "rmLowCnts", label = "Remove genes with total counts less than:", value = 10),
-                            actionButton("newDESeqNrmCnts", "New DESeq2 Norm"), actionButton("rmNrmCnts", "Remove normalized counts"), 
+                   tabPanel("Normalization", #column(1),
+                            #column(11,
+                            
+                            sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqRun",
+                                 
+                                           h3("Normalization using DESeq2 median of ratios (other methods can be added if required)"),
+                                           fluidRow(selectInput(inputId = "selectExpSmpNrm", label = "1. Select Experiment sample table for normalization", choices = NULL),),
+                                           fluidRow(h5(strong("2. Select Design Factors for differential Analysis")),),
+                                           fluidRow(
+                                             DT::dataTableOutput("selectDesignFactors"),
+                                           ),
+                                           fluidRow(
+                                             
+                                             numericInput(inputId = "rmLowCnts", label = "3. Remove genes with total counts less than:", value = 10),
+                                           ),
+                                           fluidRow(textInput("nrmedCntsName", "4. Give your normed counts a name"),),
+                                           fluidRow(h5(strong("5. Add normed counts to the workspace")),),
+                                           
+                                           fluidRow(actionButton("newDESeqNrmCnts", "New DESeq2 Norm"),)  
+                                                    
+                                           ),         
+                                           
+                              
+                              mainPanel(width = 0)
                             
                             ),
-                            #fluidRow(,
-                            fluidRow(h3("Normed Count Matrices"),
-                                     DT::dataTableOutput("nrmCntsDT")),
                             
-                            )
+                            sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqRun",
+                                           
+                                           fluidRow(h3("Normed Count Matrices"),
+                                                    DT::dataTableOutput("nrmCntsDT")),
+                                           fluidRow(actionButton("rmNrmCnts", "Remove normalized counts"),)
+                                           
+                              ),
+                              mainPanel(width = 0)
+                            ),
+                            
+                            #fluidRow(,
+                            
+                            
+                            
                             
                             ),                        
                    
@@ -168,8 +241,8 @@ ui <- fluidPage(
                    
                    column(5, 
                           
-                          h3("Gene Counts"),
-                          fluidRow(plotlyOutput("GnCntPlt")),
+                          h3("Heat Map of Count Matrix"),
+                          fluidRow(plotOutput("GnCntPlt")),
                           
                    )
                    ),
@@ -235,25 +308,22 @@ ui <- fluidPage(
                    ),
                    tabPanel("Genelists/Sequences",
                       column(3,
-                        # Select Gene List panel
-                        sidebarLayout(
-                          sidebarPanel(width = 12, id = "DESeqRun",
-                                       selectInput(label = "Select Gene List", inputId = "selectGeneTableGnTab", choices = NULL)
-
-                          ),
-                          mainPanel(width = 0)
-                        ),
+                        
                              
                              
                         # Create New gene list panel
                        sidebarLayout(
                         sidebarPanel(width = 12, id = "DESeqRun",
-                          fluidRow(selectInput(label = "Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
+                                     fluidRow(h3("Create Gene list from Differential Analysis")),
+                          fluidRow(selectInput(label = "1. Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
                           fluidRow(checkboxInput(label = "Use LFC", inputId = "LFCGeneList")),
-                          fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "Convert Gene IDs to symbols", choices = c("None", "Ensembl", "Entrez"))),
-                          fluidRow(actionButton(label = "Create New Gene List",inputId =  "createGeneList"), 
-                                   textInput(inputId = "nameGenelist", label = "Name Gene List"), 
-                                   actionButton(label = "Save Gene List to workspace", "saveGeneList"), 
+                          fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "2. Convert Gene IDs to symbols?", choices = c("No", "Ensembl", "Entrez"))),
+                          fluidRow(h5(strong("3. Create New Gene List"))),
+                          fluidRow(actionButton(label = "Create Gene List",inputId =  "createGeneList")), 
+                          fluidRow(h5(strong("4. Filter Gene List (using the table filter)"))),
+                                   fluidRow(textInput(inputId = "nameGenelist", label = "5. Name Gene List"), ),
+                                  fluidRow(h5(strong("6. Save Gene list to file"))),
+                                   fluidRow(actionButton(label = "Save Gene List", "saveGeneList"), 
                                    ),
                           #fluidRow(actionButton(label = "Write Gene List to file", inputId = "writeGeneList"))
                          ),
@@ -263,7 +333,17 @@ ui <- fluidPage(
                        # Select Gene List panel
                        sidebarLayout(
                          sidebarPanel(width = 12, id = "DESeqRun",
-                                      downloadButton(label = "Download Gene List to csv", outputId = "writeGeneList")
+                                      selectInput(label = "View Gene Lists in Workspace", inputId = "selectGeneTableGnTab", choices = NULL)
+                                      
+                         ),
+                         mainPanel(width = 0)
+                       ),
+                       
+                       # Select Gene List panel
+                       sidebarLayout(
+                         sidebarPanel(width = 12, id = "DESeqRun",
+                                      fluidRow(h3("Download Current Gene list to csv")),
+                                      fluidRow(downloadButton(label = "Download Gene List", outputId = "writeGeneList")),
                                       
                          ),
                          mainPanel(width = 0)
@@ -295,37 +375,38 @@ ui <- fluidPage(
                                    # Select Gene List panel
                                    sidebarLayout(
                                      sidebarPanel(width = 12, id = "DESeqRun",
-                                                  selectInput(label = "Select Gene List", inputId = "selectGOGnTb", choices = NULL)
+                                                  fluidRow(h3("Pathway Analysis (you can perform as many as you like)")),
+                                                  selectInput(label = "1. Select Gene List", inputId = "selectGOGnTb", choices = NULL),
                                                   
-                                     ),
-                                     mainPanel(width = 0)
-                                   ),
+                                   #   ),
+                                   #   mainPanel(width = 0)
+                                   # ),
                                    
                                    # Select GO method
-                                   sidebarLayout(
-                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                   # sidebarLayout(
+                                   #   sidebarPanel(width = 12, id = "DESeqRun",
                                         
-                                                  fluidRow(checkboxGroupInput(label = "Select GO Method(s)", inputId = "selectGOMethod", choices = c("GSEA", "ORA"))),
-                                                  fluidRow(selectInput(label = "Select Enrichment Metric for GSEA", inputId = "selectGSEAEnrich", choices = NULL))
+                                                  fluidRow(checkboxGroupInput(label = "2. Select GO Method(s)", inputId = "selectGOMethod", choices = c("GSEA", "ORA"))),
+                                                  fluidRow(selectInput(label = "3. Select Enrichment Metric for GSEA", inputId = "selectGSEAEnrich", choices = NULL)),
                                                   
-                                     ),
-                                     mainPanel(width = 0)
-                                   ),
+                                   #   ),
+                                   #   mainPanel(width = 0)
+                                   # ),
                                    
 
                                    # Select GO process
-                                   sidebarLayout(
-                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                   # sidebarLayout(
+                                   #   sidebarPanel(width = 12, id = "DESeqRun",
                                                   
-                                                  checkboxGroupInput(label = "Select Analysis", inputId = "selectGODB", 
+                                                  checkboxGroupInput(label = "4. Select Analysis", inputId = "selectGODB", 
                                                                      
                                                                      choices = c("GO Molecular Function", "GO Cellular Component", "GO Biological Process", # GO 
                                                                                  "KEGG Pathway", "Panther Pathway", 
                                                                                  "Reactome Pathway")), # pathway
                                                   
-                                     ),
-                                     mainPanel(width = 0)
-                                   ),
+                                   #   ),
+                                   #   mainPanel(width = 0)
+                                   # ),
                                    
                                    # Select GO database
                                    # sidebarLayout(
@@ -338,17 +419,18 @@ ui <- fluidPage(
                                    # ),
                                    
                                    # Run GO
-                                   sidebarLayout(
-                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                   # sidebarLayout(
+                                   #   sidebarPanel(width = 12, id = "DESeqRun",
                                                   
-                                                  checkboxInput(inputId = "saveGOChk", label = "Save Analysis Results"),
-                                                  fluidRow(shinyDirButton("dirGO", "Save Directory", "Upload"),
-                                                           verbatimTextOutput("dirGO", placeholder = TRUE)  
-                                                  ),
-                                                  textInput(inputId = "textSaveGO", label = "Name GO Analysis"), 
-                                                  actionButton(inputId = "runGO", label = "Run GO Analysis"),
+                                                  # checkboxInput(inputId = "saveGOChk", label = "Save Analysis Results"),
+                                                  # fluidRow(shinyDirButton("dirGO", "Save Directory", "Upload"),
+                                                  #          verbatimTextOutput("dirGO", placeholder = TRUE)  
+                                                  # ),
+                                                  # textInput(inputId = "textSaveGO", label = "Name GO Analysis"),
+                                                  fluidRow(h5(strong("5. Run Pathway Analysis"))), 
+                                                  actionButton(inputId = "runGO", label = "Run Analysis"),
                                                   
-                                     ),
+                                      ),
                                      mainPanel(width = 0)
                                    ),
                             ),
@@ -1023,6 +1105,7 @@ server <- function(input, output, session) {
     })
     
     ## Data Exploration tab ========================================================================================== ###
+    # plot distance heat map
     observeEvent(input$smpDist, {
       #browser()
       nt <- showNotification("Making Distance heatmap", duration = NULL)
@@ -1031,6 +1114,23 @@ server <- function(input, output, session) {
       removeNotification(nt)
     })
     
+    # plot count heat map
+    observeEvent(input$htMp, {
+      nt <- showNotification("Making Count Matrix Heatmap", duration = NULL)
+      fig <- pltHtMp(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
+      output$GnCntPlt <- renderPlot(fig)
+      removeNotification(nt)
+    })
+    
+    # PCA plot
+    observeEvent(input$pca, {
+      nt <- showNotification("Making PCA plot", duration = NULL)
+      fig <- pltPCA(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
+      output$PCAPlt <- renderPlotly(fig)
+      removeNotification(nt)      
+      
+      
+    })
     
     ## Differential tab ============================================================================================== ###
      # update normalised counts to select drop down
@@ -1506,12 +1606,12 @@ server <- function(input, output, session) {
            showModal(modalDialog(title = "Warning", "No Analysis Method selected"))
            return()  
          }         
-         if (input$textSaveGO == ""){
-           
-           showModal(modalDialog(title = "Warning", "Please name your GO analysis"))
-           return() 
-           
-         }
+         # if (input$textSaveGO == ""){
+         #   
+         #   showModal(modalDialog(title = "Warning", "Please name your GO analysis"))
+         #   return() 
+         #   
+         # }
          # if (input$dirGO == "" ){
          #   
          #   showModal(modalDialog(title = "Warning", "Please set path for output directory"))
@@ -1530,8 +1630,11 @@ server <- function(input, output, session) {
          #                     global$datapathGO, input$textSaveGO, gns, "ensembl_gene_id", input$saveGOChk, 
          #                     input$selectGOGnTb)
          x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
-                             "None", input$textSaveGO, gns, "ensembl_gene_id", FALSE, 
+                             "None", "", gns, "ensembl_gene_id", FALSE, 
                              input$selectGOGnTb)
+         # x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
+         #                     "None", input$textSaveGO, gns, "ensembl_gene_id", FALSE, 
+         #                     input$selectGOGnTb)
          removeNotification(nt)
          # Check if there was an error
          #browser()

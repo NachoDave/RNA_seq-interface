@@ -178,3 +178,72 @@ pltSmpDist <- function(cntMat, trnsFrm){
   return(fig)
   
 }
+
+pltHtMp <- function(cntMat, trnsFrm){
+  
+  if (trnsFrm == "vst"){
+    trnDt <- vst(cntMat@dds, blind = F)
+  } 
+  else if (trnsFrm == "rlog"){
+    trnDt <- rlog(cntMat@dds, blind = F)
+    
+  }
+  else {
+    trnDt <- normTransform(cntMat@dds)
+    
+  }
+  
+  #browser()
+  select <- order(rowMeans(counts(cntMat@dds,normalized=TRUE)),
+                  decreasing=TRUE)[1:20]
+  df <- as.data.frame(colData(cntMat@dds)[,names(colData(cntMat@dds))[3: length(names(colData(cntMat@dds)))- 1]])
+  fig <- pheatmap(assay(trnDt)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+           cluster_cols=FALSE, annotation_col=df)
+  
+  return(fig)
+}
+
+pltPCA <- function(cntMat, trnsFrm){
+  
+  if (trnsFrm == "vst"){
+    trnDt <- vst(cntMat@dds, blind = F)
+  } 
+  else if (trnsFrm == "rlog"){
+    trnDt <- rlog(cntMat@dds, blind = F)
+    
+  }
+  else {
+    trnDt <- normTransform(cntMat@dds)
+    
+  }
+  #browser()
+  pcaDt <- plotPCA(trnDt, intgroup=c(names(colData(cntMat@dds))[3: length(names(colData(cntMat@dds)))- 1]), returnData=TRUE)
+  p <- ggplot(pcaDt, aes(x = PC1, y = PC2, color = name)) +
+    geom_point(size=3) + 
+    xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+    ylab(paste0("PC2: ",percentVar[2],"% variance")) 
+  # percentVar <- round(100 * attr(pcaData, "percentVar"))
+  # ggplot(pcaData, aes(PC1, PC2, color=as.formula(names(colData(cntMat@dds))[2]), shape=as.formula(names(colData(cntMat@dds))[3]))) +
+  #   geom_point(size=3) +
+  #   xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  #   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  #   coord_fixed()
+  fig <- ggplotly(p) %>% config(displaylogo = FALSE,
+                                                                     modeBarButtonsToRemove = list(
+                                                                       'sendDataToCloud',
+                                                                       'pan2d',
+                                                                       'autoScale2d',
+                                                                       #'resetScale2d',
+                                                                       'hoverClosestCartesian',
+                                                                       'hoverCompareCartesian', 
+                                                                       'select2d',
+                                                                       'lasso2d',
+                                                                       'drawline',
+                                                                       'toggleSpikelines ',
+                                                                       'zoomIn2d',
+                                                                       'zoomOut2d',
+                                                                       'toggleSpikelines'
+                                                                     )) 
+  
+  return(fig)
+}
