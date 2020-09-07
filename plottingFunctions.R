@@ -119,11 +119,22 @@ plotPthWybar <- function(pthWy){
   #df <- df[order(df$enrichmentRatio, decreasing = T), ]
   df$p0p05 <- "FDR > 0.05"
   df$p0p05[df$FDR <= 0.05] <- "FDR < 0.05"
-  p <- ggplot(df, aes(x = description, y = enrichmentRatio,  text = paste("Enrichment:", enrichmentRatio, "P Val:", pValue,"Genes:", userId))) +
+  
+  if (is.null(df$enrichmentRatio)){
+    
+    p <- ggplot(df, aes(x = description, y = enrichmentScore,  text = paste("Enrichment:", sprintf("%.4g", enrichmentScore), "P Val:", sprintf("%.4g", pValue),
+                                                                            "FDR:", sprintf("%.4g", FDR)))) +
+      geom_col(colour = "black", aes(fill = p0p05), width = 0.7 ) + coord_flip() + 
+      labs(fill = "", x = "", y = "Enrichment Score" , title = paste("Gene Table:", pthWy@geneTable), subtitle = paste("DB:", pthWy@db, "Method:", pthWy@method))
+    
+  } else
+  {
+  p <- ggplot(df, aes(x = description, y = enrichmentRatio,  text = paste("Enrichment:", sprintf("%.4g", enrichmentRatio), "P Val:", sprintf("%.4g", pValue),
+                                                                          "FDR:", sprintf("%.4g", FDR)))) +
     geom_col(colour = "black", aes(fill = p0p05), width = 0.7 ) + coord_flip() + 
     labs(fill = "", x = "", y = "Enrichment Ratio" , title = paste("Gene Table:", pthWy@geneTable), subtitle = paste("DB:", pthWy@db, "Method:", pthWy@method))
              #ggtitle(paste("Gene Tab:", pthWy@geneTable, "\nDB:", pthWy@db, "Method:", pthWy@method))
-  
+}
   fig <- ggplotly(p, tooltip = c( "text"),  source = "C") %>% config(displaylogo = FALSE,
                                                                                                     modeBarButtonsToRemove = list(
                                                                                                       'sendDataToCloud',
@@ -218,6 +229,7 @@ pltPCA <- function(cntMat, trnsFrm){
   }
   #browser()
   pcaDt <- plotPCA(trnDt, intgroup=c(names(colData(cntMat@dds))[3: length(names(colData(cntMat@dds)))- 1]), returnData=TRUE)
+  percentVar <- round(100 * attr(pcaDt, "percentVar"))
   p <- ggplot(pcaDt, aes(x = PC1, y = PC2, color = name)) +
     geom_point(size=3) + 
     xlab(paste0("PC1: ",percentVar[1],"% variance")) +

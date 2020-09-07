@@ -123,9 +123,9 @@ ui <- fluidPage(
                                           
                                           fluidRow(
                                             actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
-                                            actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
+                                            #actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
                                             actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
-                                            actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
+                                            #actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
                                           ),
                                           fluidRow(actionButton(label = "Add Factors to Workspace", inputId = "updateFactors")
                                           ),
@@ -185,8 +185,12 @@ ui <- fluidPage(
                                              
                                              numericInput(inputId = "rmLowCnts", label = "3. Remove genes with total counts less than:", value = 10),
                                            ),
-                                           fluidRow(textInput("nrmedCntsName", "4. Give your normed counts a name"),),
-                                           fluidRow(h5(strong("5. Add normed counts to the workspace")),),
+                                           #fluidRow(h5(strong("4. Select column of Count table. Column 2 is unstranded data, 3 and 4 refer to the sense and anti-sense reads (Check sample prep for order)")),),
+                                           fluidRow(radioButtons(inputId = "gnCntColumn", choices = c("2", "3", "4"), inline = T, 
+                                                                 label = 
+                                                                   "4. Select column of Count table. Column 2 is unstranded data, 3 and 4 refer to the sense and anti-sense reads (check sample prep for order).")),
+                                           fluidRow(textInput("nrmedCntsName", "5. Give your normed counts a name"),),
+                                           fluidRow(h5(strong("6. Add normed counts to the workspace")),),
                                            
                                            fluidRow(actionButton("newDESeqNrmCnts", "New DESeq2 Norm"),)  
                                                     
@@ -377,80 +381,50 @@ ui <- fluidPage(
                                      sidebarPanel(width = 12, id = "DESeqRun",
                                                   fluidRow(h3("Pathway Analysis (you can perform as many as you like)")),
                                                   selectInput(label = "1. Select Gene List", inputId = "selectGOGnTb", choices = NULL),
-                                                  
-                                   #   ),
-                                   #   mainPanel(width = 0)
-                                   # ),
-                                   
-                                   # Select GO method
-                                   # sidebarLayout(
-                                   #   sidebarPanel(width = 12, id = "DESeqRun",
-                                        
+
                                                   fluidRow(checkboxGroupInput(label = "2. Select GO Method(s)", inputId = "selectGOMethod", choices = c("GSEA", "ORA"))),
                                                   fluidRow(selectInput(label = "3. Select Enrichment Metric for GSEA", inputId = "selectGSEAEnrich", choices = NULL)),
-                                                  
-                                   #   ),
-                                   #   mainPanel(width = 0)
-                                   # ),
-                                   
 
-                                   # Select GO process
-                                   # sidebarLayout(
-                                   #   sidebarPanel(width = 12, id = "DESeqRun",
-                                                  
                                                   checkboxGroupInput(label = "4. Select Analysis", inputId = "selectGODB", 
                                                                      
                                                                      choices = c("GO Molecular Function", "GO Cellular Component", "GO Biological Process", # GO 
                                                                                  "KEGG Pathway", "Panther Pathway", 
                                                                                  "Reactome Pathway")), # pathway
-                                                  
-                                   #   ),
-                                   #   mainPanel(width = 0)
-                                   # ),
-                                   
-                                   # Select GO database
-                                   # sidebarLayout(
-                                   #   sidebarPanel(width = 12, id = "DESeqRun",
-                                   #                
-                                   #                checkboxGroupInput(label = "Select GO Database(s)", inputId = "selectGODB", choices = c("GO", "KEGG", "PANTHER")),
-                                   #                
-                                   #   ),
-                                   #   mainPanel(width = 0)
-                                   # ),
-                                   
-                                   # Run GO
-                                   # sidebarLayout(
-                                   #   sidebarPanel(width = 12, id = "DESeqRun",
-                                                  
-                                                  # checkboxInput(inputId = "saveGOChk", label = "Save Analysis Results"),
-                                                  # fluidRow(shinyDirButton("dirGO", "Save Directory", "Upload"),
-                                                  #          verbatimTextOutput("dirGO", placeholder = TRUE)  
-                                                  # ),
-                                                  # textInput(inputId = "textSaveGO", label = "Name GO Analysis"),
-                                                  fluidRow(h5(strong("5. Run Pathway Analysis"))), 
+                                                  fluidRow(textInput(inputId = "textSaveGO", label = "5. Name GO Analysis"),), 
+                                                  fluidRow(h5(strong("6. Run Pathway Analysis"))), 
                                                   actionButton(inputId = "runGO", label = "Run Analysis"),
                                                   
                                       ),
                                      mainPanel(width = 0)
                                    ),
+                                   
+                                   sidebarLayout(
+                                        sidebarPanel(width = 12, id = "DESeqRun",
+                                                     selectInput(label = "Select Pathway Analysis", inputId = "selectPthWy", choices = NULL),
+                                                     actionButton(inputId = "pthWyBarPlot", label = "Bar Plot")
+                                     
+                                        ),
+                                        mainPanel(width = 0)
+                                      ),
+
                             ),
                             
-                            column(7, fluidRow(h3("Pathway Analysis"),
+                            column(10, fluidRow(h3("Pathway Analysis"),
                                                plotlyOutput("pthWyPlt")),
                                    fluidRow( uiOutput("pthWyUrl"), #textOutput("pthWyTxt"), 
                                              DT::dataTableOutput("pthWyTb")),),
-                            column(3,  sidebarLayout(
-                              sidebarPanel(width = 12, id = "DESeqRun",
-                                           selectInput(label = "Select Pathway Analysis", inputId = "selectPthWy", choices = NULL),
-                                           actionButton(inputId = "pthWyBarPlot", label = "Bar Plot")
-                                           
-                              ),
-                              mainPanel(width = 0)
-                            ),
-                                   
-                                   
-                                   
-                            )
+                            # column(3,  sidebarLayout(
+                            #   sidebarPanel(width = 12, id = "DESeqRun",
+                            #                selectInput(label = "Select Pathway Analysis", inputId = "selectPthWy", choices = NULL),
+                            #                actionButton(inputId = "pthWyBarPlot", label = "Bar Plot")
+                            #                
+                            #   ),
+                            #   mainPanel(width = 0)
+                            # ),
+                            #        
+                            #        
+                            #        
+                            # )
                             
                    ),
                    
@@ -1062,7 +1036,7 @@ server <- function(input, output, session) {
           showModal(modalDialog(title = "Warning", "No Design factors selected"))
         }else {
           
-          reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName, input$rmLowCnts)
+          reVals$analysisOb <- deseq2CntNrm(reVals$analysisOb, input$selectExpSmpNrm, desFac, input$nrmedCntsName, input$rmLowCnts, as.numeric(input$gnCntColumn))
           
           #browser()
           
@@ -1630,7 +1604,7 @@ server <- function(input, output, session) {
          #                     global$datapathGO, input$textSaveGO, gns, "ensembl_gene_id", input$saveGOChk, 
          #                     input$selectGOGnTb)
          x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
-                             "None", "", gns, "ensembl_gene_id", FALSE, 
+                             "None", input$textSaveGO, gns, "ensembl_gene_id", FALSE, 
                              input$selectGOGnTb)
          # x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
          #                     "None", input$textSaveGO, gns, "ensembl_gene_id", FALSE, 
@@ -1644,7 +1618,7 @@ server <- function(input, output, session) {
            
          } else
          {
-           
+           #browser()
            reVals$analysisOb <- x
            updateSelectInput(session, "selectPthWy", choices = names(reVals$analysisOb@PthWyAnl))
          }

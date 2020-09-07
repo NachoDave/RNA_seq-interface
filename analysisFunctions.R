@@ -4,7 +4,7 @@ source("RNA_SeqSaveClass.R")
 source("nrmCntResults.R")
 source("pathWaySave.R")
 # Function to normalize counts using DESeq2 
-deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
+deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10, selCol = 2){
   
   # takes in a rna_seq analysis object and the name of the experimental sample table
   # and creates the count matrix and colData to create a DESeq2 object and normalizes
@@ -20,12 +20,12 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10){
    
    if (dx == 1){
      
-     gnCntMat <- data.frame(x = tGnCnt[, 4])
+     gnCntMat <- data.frame(x = tGnCnt[, selCol])
      rownames(gnCntMat) <- tGnCnt[, 1]
      
    } else
    {
-     gnCntMat$x <- tGnCnt[, 4]
+     gnCntMat$x <- tGnCnt[, selCol]
      
    }
    colnames(gnCntMat)[dx] <- colDt[[dx, 1]]
@@ -146,8 +146,10 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
 
          if (mthdx == "ORA"){
            tGns <- as.vector(gns[, 1])
+           topThr = 25
          } else {
            tGns <- gns
+           topThr = 20
          }
 
          # "GO Molecular Function", "GO Cellular Component", "GO Biological Process", # GO 
