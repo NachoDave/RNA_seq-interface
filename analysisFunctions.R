@@ -82,7 +82,7 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10, selCol = 2
 # Make DESeq2 results
 
 deseq2DA <- function(ob, nrmCnts, cntrstRef, cntrstCnd){
-  #browser()
+  browser()
   
   ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]] <- relevel(ob@NrmCnts[[nrmCnts]]@dds[[cntrstRef]], ref = cntrstCnd)
   ob@NrmCnts[[nrmCnts]]@dds <- DESeq(ob@NrmCnts[[nrmCnts]]@dds)
@@ -97,7 +97,7 @@ deseq2Res <- function(ob, nrmCnts, fac, cntrst, LFC = FALSE, lfcMethod = "apeglm
   # nrmCnts - name of the normed counts
   # fac - the analysis factor
   # Cntrst - the control level
-  #browser()
+  browser()
   
   # When labelling the comparison conditions DESeq2 puts the control variable 2nd on the contrast and coef
   levs <- levels(ob@NrmCnts[[nrmCnts]]@dds@colData@listData[[fac]])
@@ -177,14 +177,14 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
          
          prjNm <- paste(nm, enDb, mthdx, sep = "_")
           # Overlap tissue with cell =====================================================================================#
-        # browser() 
+         #browser() 
          x <- WebGestaltR(enrichMethod=mthdx, 
                                     organism="hsapiens",
                                     enrichDatabase=enDb, 
                                     interestGene = tGns,
                                      interestGeneType=idType, # gene id type 
                                      referenceSet = refSet,
-                                     #outputDirectory=pth, 
+                                     outputDirectory="/tmp/", 
                                     projectName=prjNm,
                                     isOutput=output, 
                                     sigMethod='top',
@@ -210,3 +210,64 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
     return(e)}
   )
 }
+
+# Compare gene lists ======================================================================================================= #
+cmpGnList <- function(lst1, lst2, setOp){
+  #browser()
+  # get stuff from the lists
+  
+  if (setOp == "In both"){
+    
+    lst <- intersect(rownames(lst1), rownames(lst2))
+    
+    
+    if (any(colnames(lst1) == "Gene Symbol")){
+
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"])
+
+    }
+    else {
+      
+      lst <- data.frame(ID = lst)
+      
+    }
+
+  } else if (setOp == "In list 1 not 2"){
+    
+    lst <-setdiff(rownames(lst1), rownames(lst2))
+    
+    if (any(colnames(lst1) == "Gene Symbol")){
+      
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"])
+      
+    }
+    else {
+      
+      lst <- data.frame(ID = lst)
+      
+    }
+    
+  } else  {
+    
+    lst <-setdiff(rownames(lst2), rownames(lst1))
+    
+    
+    if (any(colnames(lst1) == "Gene Symbol")){
+      
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst2[lst, "Gene Symbol"])
+      
+    }
+    else {
+      
+      lst <- data.frame(ID = lst)
+      
+    }
+    
+  }
+  
+  rownames(lst) <- lst$ID
+  
+  return(lst)
+  
+}
+

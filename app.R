@@ -123,9 +123,9 @@ ui <- fluidPage(
                                           
                                           fluidRow(
                                             actionButton(label = "Add Factor", inputId = "addFactor", icon = icon("plus")),
-                                            #actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
+                                            actionButton(label = "Add level", inputId = "addLevel", icon = icon("plus")),
                                             actionButton(label = "Remove Factor", inputId = "rmFactor", icon = icon("minus")),
-                                            #actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
+                                            actionButton(label = "Remove level", inputId = "rmLevel", icon = icon("minus")),
                                           ),
                                           fluidRow(actionButton(label = "Add Factors to Workspace", inputId = "updateFactors")
                                           ),
@@ -139,13 +139,14 @@ ui <- fluidPage(
                                           fluidRow(h3('Create Experiment Sample Table'),
                                           selectInput(label = "1. Select Factors Table", inputId = "selectFacTab", choices = NULL),
                                           ),
-                                           
-                                          fluidRow(h5(strong('2. Select Samples you want to analyse from the loaded Gene Count tables (in left panel)'))),
-                                          fluidRow(h5(strong('3. Create a new Experiment sample table'))),
+                                          
+                                          fluidRow(textInput("nameExpSamTab", "2. Give your experiment sample table a name", placeholder = "Experiment name")),
+                                          fluidRow(h5(strong('3. Select Samples you want to analyse from the loaded Gene Count tables (in left panel)'))),
+                                          fluidRow(h5(strong('4. Create a new Experiment sample table'))),
                                           fluidRow(actionButton("newExpSmpTab", "New Sample Exp table")), # start a new assign factors table
                                           fluidRow(
                                             
-                                            textInput("nameExpSamTab", "4. Give your experiment sample table a name", placeholder = "Experiment name"),
+                                            
                                             
                                             DT::dataTableOutput('assignfactors'),
                                             
@@ -259,7 +260,7 @@ ui <- fluidPage(
                               sidebarPanel(width = 12, id = "DESeqRun",
                                 fluidRow(selectInput(label = "Select Normalized Counts", inputId = "selectNrmCntsDiff", choices = NULL), 
                                    selectInput(label = "Select Contrast Factor", inputId = "selectNrmCntsCntrst", choices = NULL),
-                                   selectInput(label = "Select constrast condition", inputId = "selectNrmCntsCnd", choices = NULL)),
+                                   selectInput(label = "Select constrast level (usually the control)", inputId = "selectNrmCntsCnd", choices = NULL)),
                                 fluidRow(actionButton(label = "Run DESeq2", inputId = "runDESeq2")),
                                 
                               ),
@@ -321,12 +322,12 @@ ui <- fluidPage(
                                      fluidRow(h3("Create Gene list from Differential Analysis")),
                           fluidRow(selectInput(label = "1. Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
                           fluidRow(checkboxInput(label = "Use LFC", inputId = "LFCGeneList")),
-                          fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "2. Convert Gene IDs to symbols?", choices = c("No", "Ensembl", "Entrez"))),
+                          fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "2. Convert Gene IDs to symbols?", choices = c("No", "Ensembl", "Entrez"), selected = "Ensembl")),
                           fluidRow(h5(strong("3. Create New Gene List"))),
                           fluidRow(actionButton(label = "Create Gene List",inputId =  "createGeneList")), 
-                          fluidRow(h5(strong("4. Filter Gene List (using the table filter)"))),
+                          fluidRow(h5(strong("4. Filter Gene List (using the table filters)"))),
                                    fluidRow(textInput(inputId = "nameGenelist", label = "5. Name Gene List"), ),
-                                  fluidRow(h5(strong("6. Save Gene list to file"))),
+                                  fluidRow(h5(strong("6. Save Gene list to workspace"))),
                                    fluidRow(actionButton(label = "Save Gene List", "saveGeneList"), 
                                    ),
                           #fluidRow(actionButton(label = "Write Gene List to file", inputId = "writeGeneList"))
@@ -371,6 +372,48 @@ ui <- fluidPage(
                              
                        )
       
+                   ),
+                   tabPanel("Gene List Overlaps", 
+                            
+                            column(3,
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                                  fluidRow(h3("Find Overlaps in Gene Lists")),
+                                                  fluidRow(selectInput(inputId = "cmpGeneList1", label = "Select First Gene List", choices = NULL)),
+                                                  fluidRow(selectInput(inputId = "cmpGeneListOp", label = "Select Operation", choices = c("In both", "In list 1 not 2", "In list 2 not 1"))),
+                                                  fluidRow(selectInput(inputId = "cmpGeneList2", label = "Select Second Gene List", choices = NULL)),
+                                                  fluidRow(actionButton(inputId = "cmpGeneList", label = "Find Overlaps")),
+                                                  
+                                                  fluidRow(textInput(inputId = "nameGenelistCmp", label = "Name Gene List"), ),
+                                                  #fluidRow(h5(strong("Save Gene list to workspace"))),
+                                                  fluidRow(actionButton(label = "Save Gene List to Workspace", "saveGeneListCmp")),
+                                                  
+                                                  fluidRow(downloadButton(label = "Download Gene List", outputId = "writeCmpGeneList")),
+
+                                     ),
+                                     mainPanel(width = 0)
+
+                                   ),
+
+
+                            ),
+                            column(9,
+                                   sidebarLayout(
+                                     sidebarPanel(width = 12, id = "DESeqRun",
+                                                  #fluidRow(h3("Overlap Venn"),
+                                                           
+                                                  fluidRow(h3("Gene List")),
+                                                  fluidRow(DT::dataTableOutput("ovrLpGnTab")),
+                                                  #fluidRow(plotlyOutput("ovrLpGnPlt")),
+                                                  #    helpText("To filter the based on values type string 'lower Value ... Upper Value' into
+                                                  # filter boxes after table, i.e to filter p value between 0 and 0.05 type 0 ... 0.5 into the p value filter")
+                                     ),
+                                     mainPanel(width = 0)
+
+                                   )),
+   
+                            
+                            
                    ),
                    
                    
@@ -450,7 +493,8 @@ server <- function(input, output, session) {
                              assignFactorsTab = tibble(`Gene Count Table` = "Nothing Selected"),
                              nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = ""),
                              maFig = ggplotly(), volFig = ggplotly(), 
-                             curGeneTab = data.frame()
+                             curGeneTab = data.frame(), 
+                             gnCmp = data.frame()
                              )
     
     
@@ -461,7 +505,7 @@ server <- function(input, output, session) {
     # selectGnCnts 
     # factorsTab is a tibble with the current factors
     # curFac stores the index of the currently in use factors table stored in the analysisOb
-    
+    # gnCmp stores the compared gene lists
     
     # Load/create analysis objects --------------------------------------------------------------------- # 
     # Create new analysis object to store data and results
@@ -568,7 +612,8 @@ server <- function(input, output, session) {
                      
                      # Recreate the tables etc
                      # Gene counts table table
-                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
+                     #output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
+                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE)
                      
                      # Factors tables and drp downs
                      #browser()
@@ -619,8 +664,8 @@ server <- function(input, output, session) {
 
                        output$geneListDT <- DT::renderDataTable(gnTbDT
                                                                 , server = TRUE,  rownames = T)
-
-
+                       updateSelectInput(session, "cmpGeneList1", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+                       updateSelectInput(session, "cmpGeneList2", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
                      }
                      #browser()
                      if (length(reVals$analysisOb@PthWyAnl) > 0 )
@@ -805,6 +850,7 @@ server <- function(input, output, session) {
     
     # Helper function for making dropdown single row
     shinyInput1 = function(FUN, idx, id,...) {
+      browser()
       inputs = character(idx)
       #for (i in seq_len(len)) {
       inputs = as.character(FUN(paste0(id, idx), label = NULL, ...))
@@ -870,7 +916,7 @@ server <- function(input, output, session) {
  
     # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$newExpSmpTab,{
-        #browser()
+        browser()
         
       ## You need to remove the ui drop downs from the currently displayed table. If you don't and the new table has factor
       ## names which are the same as the old one, it wil use the selected values from the old table and not update
@@ -895,6 +941,7 @@ server <- function(input, output, session) {
       }
       }
       # Create a new empty table
+      reVals$assignFactorsTab <- NULL
         reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@GeneMeta[input$genCntTabTab_rows_selected, 1])
         
         
@@ -909,7 +956,7 @@ server <- function(input, output, session) {
 
         }
         
-         
+        output$assignfactors <- NULL   
     output$assignfactors <- DT::renderDataTable(isolate(reVals$assignFactorsTab), server = FALSE, escape = FALSE, selection = 'none', options = list(
         dom = 't', paging = FALSE, ordering = FALSE,
         preDrawCallback = JS('function() { Shiny.unbindAll(this.api().table().node()); }'),
@@ -920,8 +967,9 @@ server <- function(input, output, session) {
     
     # save an example table
     observeEvent(input$saveExpSmpTab, {
-      #browser()
+      browser()
       
+      #reVals$assignFactorsTab <- NULL
       # Loop through and remove the UI objects
       
       ## I'm not sure why, but upon exiting the save the reVals$assignFacTab object stops being a 
@@ -1493,6 +1541,8 @@ server <- function(input, output, session) {
         #browser()
         updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  input$nameGenelist)
         updateSelectInput(session, "selectGOGnTb", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]]) # update gene table on GO tab
+        updateSelectInput(session, "cmpGeneList1", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+        updateSelectInput(session, "cmpGeneList2", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
       } else if(ncol(reVals$curGeneTab) < 1)
       {
         
@@ -1533,6 +1583,64 @@ server <- function(input, output, session) {
          }
        )
 
+       ### Overlapping Gene list tab ================================================================================================== ###
+       ### ================================================================================================================ ###   
+        # Run the compare gene lists
+       observeEvent(input$cmpGeneList, {
+         if (input$cmpGeneList1 == "" | input$cmpGeneList2 == ""){
+           showModal(modalDialog(title = "Warning", "No Gene lists to compare"))
+         } else {
+          reVals$gnCmp <- cmpGnList(reVals$analysisOb@GeneTables[[input$cmpGeneList1]]@gnTbl, reVals$analysisOb@GeneTables[[input$cmpGeneList2]]@gnTbl, input$cmpGeneListOp)
+         #browser()
+         #output to table
+          output$ovrLpGnTab <- DT::renderDataTable(reVals$gnCmp, server = TRUE,  rownames = F)
+       }
+       })
+       
+       
+       # Save gene list to work space
+       observeEvent(input$saveGeneListCmp, {
+         # create new gene list object
+         # checj if table ok 
+         #browser()
+         
+         # check if name used
+         if(input$nameGenelistCmp == "" || (input$nameGenelist %in% names(reVals$analysisOb@GeneTables))){
+           showModal(modalDialog(title = "Warning", "You haven't named the gene list, or the name has already been used"))
+           return()
+         }
+         
+         if (ncol(reVals$gnCmp) == 0){
+           showModal(modalDialog(title = "Warning", "You need to create an overlapping gene list"))
+           return()
+           
+         }
+         
+         tGnTbOb <- new("geneTableDA")
+         tGnTbOb <- addGeneTableDA(tGnTbOb, reVals$gnCmp, paste("Overlap Gene Lists:", input$cmpGeneList1, input$cmpGeneList2), "GeneOverlaps")
+         reVals$analysisOb <- addGeneTable(reVals$analysisOb, tGnTbOb, input$nameGenelistCmp)
+         
+         # Update gene lists drop downs
+         updateSelectInput(session, "selectGeneTableGnTab", choices = names(reVals$analysisOb@GeneTables), selected =  input$nameGenelist)
+         updateSelectInput(session, "selectGOGnTb", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]]) # update gene table on GO tab
+         updateSelectInput(session, "cmpGeneList1", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+         updateSelectInput(session, "cmpGeneList2", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
+         
+         
+       } )
+       
+       output$writeCmpGeneList <- downloadHandler(
+         
+         filename = function() {
+           paste("Compare_", input$cmpGeneList1,  "_", input$cmpGeneList2, ".csv", sep = "")
+         },
+         content = function(file) {
+           #browser()
+           write.csv(reVals$gnCmp, file, row.names = TRUE)
+         }
+       )
+       
+       
     ###  GO Analysis tab =============================================================================================== ###
        
        # Save GO analysis ---------------------------------------------------------------------------------------------- ###
@@ -1594,10 +1702,10 @@ server <- function(input, output, session) {
          # }
          # 
          # Find ID type from gene table
-         
+         #browser()
          nt <- showNotification("Pathway Analysis Running", duration = NULL)
          gns <- data.frame(rownames(reVals$analysisOb@GeneTables[[input$selectGOGnTb]]@gnTbl),
-                  reVals$analysisOb@GeneTables[[input$selectGeneTableGnTab]]@gnTbl[[input$selectGSEAEnrich]])
+                  reVals$analysisOb@GeneTables[[input$selectGOGnTb]]@gnTbl[[input$selectGSEAEnrich]])
          colnames(gns) <- c("ID", "input$selectGSEAEnrich")
          
          # x <- runWebGestaltR(reVals$analysisOb, input$selectGODB, input$selectGOMethod,
