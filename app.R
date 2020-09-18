@@ -20,7 +20,7 @@ source("nrmCntResults.R")
 source("plottingFunctions.R")
 source("geneTable.R")
 source("pathWaySave.R")
-options(shiny.maxRequestSize = 50*1024^2)
+options(shiny.maxRequestSize = 120*1024^2)
 library(EnsDb.Hsapiens.v86)
 library(WebGestaltR)
 library(apeglm)
@@ -699,7 +699,7 @@ server <- function(input, output, session) {
     observeEvent(input$loadCntTab, {
         #print(reVals$analysisOb)
         #print(input$loadCntTab$name)
-        reVals$geneCntIn <- read.csv(input$loadCntTab$datapath, skip = 4, sep = "\t")
+        reVals$geneCntIn <- read.csv(input$loadCntTab$datapath, skip = 3, sep = "\t")
          # check if the data has 4 columns
         if (ncol(reVals$geneCntIn) != 4){
           
@@ -710,7 +710,7 @@ server <- function(input, output, session) {
         colnames(reVals$geneCntIn) <- c("ENSEMBL_ID", "+", "-", "All")
         #print(head(reVals$geneCntIn))
         #print(analysisOb)
-        
+        #browser()
         # show description dialog
         showModal(dataModal())
         }
@@ -721,7 +721,7 @@ server <- function(input, output, session) {
         reVals$geneSetDes <- input$description
         
         # Write gene count table and meta data to analysisOb
-        
+        #browser()
         reVals$analysisOb <- newGeneCnts(isolate(reVals$analysisOb), reVals$geneCntIn, data.frame(Description = reVals$geneSetDes, FileName = input$loadCntTab$name, stringsAsFactors = F))
         reVals$geneSetDes <- "" # reset the description
         reVals$geneCntIn <- NULL
@@ -841,6 +841,7 @@ server <- function(input, output, session) {
     
     # Helper function for making dropdown multi row
     shinyInput = function(FUN, len, id,...) {
+      #browser()
         inputs = character(len)
         for (i in seq_len(len)) {
             inputs[i] = as.character(FUN(paste0(id, i), label = NULL, ...))
@@ -850,7 +851,7 @@ server <- function(input, output, session) {
     
     # Helper function for making dropdown single row
     shinyInput1 = function(FUN, idx, id,...) {
-      browser()
+      #browser()
       inputs = character(idx)
       #for (i in seq_len(len)) {
       inputs = as.character(FUN(paste0(id, idx), label = NULL, ...))
@@ -860,6 +861,7 @@ server <- function(input, output, session) {
     
     # helper function for reading selections
     shinyValue = function(id, len) {
+     # browser()
         unlist(lapply(seq_len(len), function(i) {
             value = input[[paste0(id, i)]]
             if (is.null(value)){
@@ -872,10 +874,12 @@ server <- function(input, output, session) {
     
     # helper function to read drop down menu tabs from ExpSamp DT into tibble (with correct options)
     readDropDownDTtoTib = function(dt){
-      
+     # browser()
+      newTabNm <- input$nameExpSamTab # the name of the new sample tabl
+      curTabNm <- input$selectExpSmp
       for (dx in 2:ncol(dt)){
         
-        dt[colnames(dt[dx])] <- shinyValue(colnames(dt[dx]),nrow(dt))
+        dt[colnames(dt[dx])] <- shinyValue(paste0(newTabNm, "_", colnames(dt[dx])),nrow(dt))
         
       }
    
@@ -888,7 +892,7 @@ server <- function(input, output, session) {
       #browser()
       # tib = the selected factors
       # facs = the associated factors table
-       
+      curTabNm <- input$selectExpSmp
     for (cx in 1:nrow(tib)){
 
       for (dx in 1:nrow(facs[,1])){
@@ -896,7 +900,7 @@ server <- function(input, output, session) {
         tib[cx, facs[[dx, 1]]] <-
           shinyInput1(selectInput,
                      cx,
-                     facs[[dx,1]],
+                     paste0(curTabNm, "_", facs[[dx,1]]),
                      choices=as.character(facs[dx, 2:ncol(facs)]), selected = sel) # overwrite the assignFactorsTab
 
       }
@@ -916,8 +920,21 @@ server <- function(input, output, session) {
  
     # Update the assign factors table when update assign factors button is pushed
     observeEvent(input$newExpSmpTab,{
-        browser()
+        #browser()
+        # check a neew name is given
+      if (input$nameExpSamTab == ""){ # check if the object has a name
         
+        showModal(modalDialog(title = "Warning", "Please give your experiment sample table a name"))
+        return()
+        
+      } else if (input$nameExpSamTab %in% names(reVals$analysisOb@ExpSmpFactorsTab)){
+        showModal(modalDialog(title = "Warning", "Experiment sample table name already exists"))
+        return()
+      } 
+      
+      newTabNm <- input$nameExpSamTab # the name of the new sample table
+      curTabNm <- input$selectExpSmp # current sample table
+      
       ## You need to remove the ui drop downs from the currently displayed table. If you don't and the new table has factor
       ## names which are the same as the old one, it wil use the selected values from the old table and not update
       
@@ -951,7 +968,7 @@ server <- function(input, output, session) {
             reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
                                           shinyInput(selectInput,
                                                                length(input$genCntTabTab_rows_selected),
-                                                               reVals$factorsTab[[dx,1]],
+                                                                paste0(newTabNm, "_", reVals$factorsTab[[dx,1]]),
                                                                choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
 
         }
@@ -965,9 +982,9 @@ server <- function(input, output, session) {
     
     })
     
-    # save an example table
+    # save an example table ======================================================================================================= #
     observeEvent(input$saveExpSmpTab, {
-      browser()
+      #browser()
       
       #reVals$assignFactorsTab <- NULL
       # Loop through and remove the UI objects
@@ -977,22 +994,26 @@ server <- function(input, output, session) {
       ## bit of code converts it back so you can change an already saved table
       
       # At the moment you can't change an exp factors table
+      # if (any(class(reVals$assignFactorsTab) == "shiny.render.function")){
+      #   reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1])
+      # 
+      # reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmp]]]]
+      # 
+      # for (dx in 1:nrow(reVals$factorsTab[,1])){ # add factor columns
+      #   
+      #   reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
+      #     shinyInput(selectInput,
+      #                length(reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1]),
+      #                reVals$factorsTab[[dx,1]],
+      #                choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
+      #   
+      # }
+      # }
       if (any(class(reVals$assignFactorsTab) == "shiny.render.function")){
-        reVals$assignFactorsTab <- tibble(`Gene Count tab` = reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1])
-      
-      reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$analysisOb@ExpSmpFactorsTab[[input$selectExpSmp]]]]
-      
-      for (dx in 1:nrow(reVals$factorsTab[,1])){ # add factor columns
         
-        reVals$assignFactorsTab[, reVals$factorsTab[[dx, 1]]] <-
-          shinyInput(selectInput,
-                     length(reVals$analysisOb@ExpSmpTab[[input$selectExpSmp]][1]),
-                     reVals$factorsTab[[dx,1]],
-                     choices=as.character(reVals$factorsTab[dx, 2:ncol(reVals$factorsTab)])) # overwrite the assignFactorsTab
+        showModal(modalDialog(title = "Warning", "Please create new Experiment sample table before adding to workspace"))
         
       }
-      }
-      
      
       if (ncol(reVals$assignFactorsTab) > 1){
       # create new dataframe
@@ -1605,7 +1626,7 @@ server <- function(input, output, session) {
          #browser()
          
          # check if name used
-         if(input$nameGenelistCmp == "" || (input$nameGenelist %in% names(reVals$analysisOb@GeneTables))){
+         if(input$nameGenelistCmp == "" || (input$nameGenelistCmp %in% names(reVals$analysisOb@GeneTables))){
            showModal(modalDialog(title = "Warning", "You haven't named the gene list, or the name has already been used"))
            return()
          }
