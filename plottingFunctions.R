@@ -3,6 +3,7 @@ library(ggplot2)
 library(plotly)
 library("pheatmap")
 library("RColorBrewer")
+library(ggforce)
 
 maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   #browser()
@@ -258,4 +259,37 @@ pltPCA <- function(cntMat, trnsFrm){
                                                                      )) 
   
   return(fig)
+}
+
+# Venn diagram
+pltVenn <- function(labelA, labelB, txt){
+  df.venn <- data.frame(x = c(-.866, 0.866), y = c(0, 0), labels = c(labelA, labelB))
+  venn <- ggplot(df.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) + 
+           geom_circle(alpha = 0.4, size = 0.5, colour = 'grey') + 
+           coord_fixed() + 
+           theme_void() + 
+          theme(legend.position = 'bottom') + 
+          scale_fill_manual(values = c('gold', 'firebrick')) +
+          scale_colour_manual(values = c('gold', 'firebrick'), guide = FALSE) + 
+    labs(fill = NULL) + 
+    annotate("text", x = c(-1, 0, 1), y = c(0, 0, 0), label = txt, size = 5)
+  
+  #' fig = ggplotly(venn) %>% config(displaylogo = FALSE,
+  #'                                 modeBarButtonsToRemove = list(
+  #'                                   'sendDataToCloud',
+  #'                                   'pan2d',
+  #'                                   'autoScale2d',
+  #'                                   #'resetScale2d',
+  #'                                   'hoverClosestCartesian',
+  #'                                   'hoverCompareCartesian', 
+  #'                                   'select2d',
+  #'                                   'lasso2d',
+  #'                                   'drawline',
+  #'                                   'toggleSpikelines ',
+  #'                                   'zoomIn2d',
+  #'                                   'zoomOut2d',
+  #'                                   'toggleSpikelines'
+  #'                                 )) 
+  #' return(fig)
+  return(venn)
 }

@@ -213,7 +213,7 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
 
 # Compare gene lists ======================================================================================================= #
 cmpGnList <- function(lst1, lst2, setOp){
-  browser()
+  #browser()
   # get stuff from the lists
   
   if (setOp == "In both"){
