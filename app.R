@@ -20,13 +20,15 @@ source("nrmCntResults.R")
 source("plottingFunctions.R")
 source("geneTable.R")
 source("pathWaySave.R")
-options(shiny.maxRequestSize = 120*1024^2)
+options(shiny.maxRequestSize =200*1024^2)
 library(EnsDb.Hsapiens.v86)
 library(WebGestaltR)
 library(apeglm)
 library(ashr)
 #library()
 # Define UI for application that draws a histogram
+addResourcePath('fastQcDir', '/data/RNASeqAnalysis/RScripts/shinyTmp/')
+
 ui <- fluidPage(
   
   # use css to define boxes around groups of buttons
@@ -97,9 +99,35 @@ ui <- fluidPage(
         # Main menus showing analysis options
         column(9,
                tabsetPanel(
+                 
                    ## QC tab panel ---------------------------------------------------------------------------## 
                    tabPanel("Quality Control", 
                             column(4),
+                            fluidRow(sidebarLayout(
+                              sidebarPanel(width=12, id = "DESeqRun",
+                                        #fluidRow(htmlOutput("fastqcPg")),   
+                                         fluidRow(fileInput(inputId = 'selectQCDir', label = "Select FASTQC directory", multiple = TRUE,
+                                                   placeholder = "Select FASTQC files") ),
+                                         
+                                         fluidRow(DT::dataTableOutput("fastqcDT")),
+                                          #fluidRow(htmlOutput("fastqcPg"))
+                                           
+                                           ),
+                              mainPanel(width = 0)
+                            )),
+                            fluidRow(
+                              sidebarLayout(
+                                sidebarPanel(width = 12, id = "DESeqRun",
+                                  fluidRow(htmlOutput("fastqcPg"))
+                                ),
+                                mainPanel(width = 0)
+                                
+                              )
+                              
+                            )
+                            
+                            
+                            
                             ), # Check fastq qc
                    
                    ## Factors tab panel ---------------------------------------------------------------------------## 
@@ -494,7 +522,8 @@ server <- function(input, output, session) {
                              nrmedCntsTab = tibble(Name = "", `Exp Smp List` = "", `Norm Method` = "", `Design Factors` = ""),
                              maFig = ggplotly(), volFig = ggplotly(), 
                              curGeneTab = data.frame(), 
-                             gnCmp = data.frame()
+                             gnCmp = data.frame(),
+                             qcHtml = data.frame()
                              )
     
     
@@ -729,7 +758,7 @@ server <- function(input, output, session) {
         removeModal()
 
         # Update the gene counts table
-        output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
+        output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE)
         #output$y12 = renderPrint(input$genCntTabTab_rows_selected)
         
     })
@@ -1065,6 +1094,53 @@ server <- function(input, output, session) {
       }else{
       updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = names(reVals$analysisOb@ExpSmpFactorsTab)[[1]])
       }
+      
+    })
+    
+
+## QC tab ========================================================================================================= ###
+    
+    observeEvent(input$selectQCDir, {
+      #browser()  
+      fstQCHtmlDx <- lapply(input$selectQCDir[1], function(x) grep(".fastqc.html", x))
+      fstQCZipDx <- lapply(input$selectQCDir[1], function(x) grep(".fastqc.zip", x))
+      
+      if (!(length(fstQCHtmlDx$name) == length(fstQCZipDx$name))){
+        showModal(modalDialog(tite = "Warning", "The number of FASTQC html files is not equal to the number fo FASTQC zip files"))
+        
+        return()
+        
+      }
+      
+      
+      if (nrow(reVals$qcHtml) == 0){
+      
+      reVals$qcHtml <- input$selectQCDir[fstQCHtmlDx$name, ]
+      reVals$qcHtml <- cbind(reVals$qcHtml, input$selectQCDir[fstQCZipDx$name, ])
+      }
+      else {
+        
+        
+        
+      }
+      
+      lapply(1:nrow(reVals$qcHtml), function(x) file.copy(reVals$qcHtml[x, 4], paste0("/data/RNASeqAnalysis/RScripts/shinyTmp/", reVals$qcHtml[x, 1]), overwrite = TRUE))
+      
+      
+      output$fastqcDT <- DT::renderDataTable(reVals$qcHtml[, c(1,4)], selection = list(mode = 'single', selected = '1'), options = list(pageLength = 10))
+      
+      #output$fastqcPg <- renderUI(tags$iframe(src=reVals$qcHtml[1, 4], height = 600, width = 600))
+      #output$fastqcPg <- renderUI(includeHTML(reVals$qcHtml[1, 4]))
+      output$fastqcPg <- renderUI(tags$iframe(src = paste0("fastQcDir/", reVals$qcHtml[1, 1]), height = 800, width = 1400))
+      
+    }
+    )
+    
+    # Display a different FASTQC file on rows selected
+    observeEvent(input$fastqcDT_rows_selected,  {
+      
+      #browser()
+      output$fastqcPg <- renderUI(tags$iframe(src = paste0("fastQcDir/", reVals$qcHtml[input$fastqcDT_rows_selected, 1]), height = 800, width = 1400))
       
     })
     
@@ -1614,7 +1690,9 @@ server <- function(input, output, session) {
           reVals$gnCmp <- cmpGnList(reVals$analysisOb@GeneTables[[input$cmpGeneList1]]@gnTbl, reVals$analysisOb@GeneTables[[input$cmpGeneList2]]@gnTbl, input$cmpGeneListOp)
          #browser()
          #output to table
-          output$ovrLpGnTab <- DT::renderDataTable(reVals$gnCmp, server = TRUE,  rownames = F)
+          tGnOvlpTb <- reVals$gnCmp
+          tGnOvlpTb[sapply(reVals$gnCmp, is.numeric)]  <- round(reVals$gnCmp[sapply(reVals$gnCmp, is.numeric)], 4)
+          output$ovrLpGnTab <- DT::renderDataTable(tGnOvlpTb, server = TRUE,  rownames = F)
        }
        })
        

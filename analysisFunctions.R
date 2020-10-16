@@ -213,7 +213,7 @@ runWebGestaltR <- function(ob, db, enrichMeth, pth, nm, gns, idType, output, gnT
 
 # Compare gene lists ======================================================================================================= #
 cmpGnList <- function(lst1, lst2, setOp){
-  #browser()
+  browser()
   # get stuff from the lists
   
   if (setOp == "In both"){
@@ -223,12 +223,29 @@ cmpGnList <- function(lst1, lst2, setOp){
     
     if (any(colnames(lst1) == "Gene Symbol")){
 
-      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"])
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"], 
+                        `log2FoldChange_1` = lst1[lst, "log2FoldChange"], 
+                        `pvalue_1` = lst1[lst, "pvalue"],
+                        `padj_1` = lst1[lst, "padj"],
+                        log2FoldChange_2 = lst2[lst, "log2FoldChange"],
+                        pvalue_2 = lst2[lst, "pvalue"],
+                        padj_2 = lst2[lst, "padj"],
+                        log2FoldChange_Mean = (lst1[lst, "log2FoldChange"] + lst2[lst, "log2FoldChange"])/2)
 
+    } else if (any(colnames(lst1) == "Gene.Symbol")){
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene.Symbol"])
+      
     }
     else {
       
-      lst <- data.frame(ID = lst)
+      lst <- data.frame(ID = lst, 
+                        `log2FoldChange_1` = lst1[lst, "log2FoldChange"], 
+                        `pvalue_1` = lst1[lst, "pvalue"],
+                        `padj_1` = lst1[lst, "padj"],
+                        log2FoldChange_2 = lst2[lst, "log2FoldChange"],
+                        pvalue_2 = lst2[lst, "pvalue"],
+                        padj_2 = lst2[lst, "padj"],
+                        log2FoldChange_Mean = (lst1[lst, "log2FoldChange"] + lst2[lst, "log2FoldChange"])/2)
       
     }
 
@@ -238,28 +255,44 @@ cmpGnList <- function(lst1, lst2, setOp){
     
     if (any(colnames(lst1) == "Gene Symbol")){
       
-      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"])
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst1[lst, "Gene Symbol"], 
+                        `log2FoldChange` = lst1[lst, "log2FoldChange"], 
+                        `pvalue` = lst1[lst, "pvalue"],
+                        `padj` = lst1[lst, "padj"]
+          )
       
     }
     else {
       
-      lst <- data.frame(ID = lst)
+      lst <- data.frame(ID = lst, 
+                        `log2FoldChange` = lst1[lst, "log2FoldChange"], 
+                        `pvalue` = lst1[lst, "pvalue"],
+                        `padj` = lst1[lst, "padj"]
+      )
       
     }
     
-  } else  {
+  } else  { # in list 2 not 1
     
     lst <-setdiff(rownames(lst2), rownames(lst1))
     
     
     if (any(colnames(lst1) == "Gene Symbol")){
       
-      lst <- data.frame(ID = lst, `Gene Symbol` = lst2[lst, "Gene Symbol"])
+      lst <- data.frame(ID = lst, `Gene Symbol` = lst2[lst, "Gene Symbol"], 
+                        `log2FoldChange` = lst2[lst, "log2FoldChange"], 
+                        `pvalue` = lst2[lst, "pvalue"],
+                        `padj` = lst2[lst, "padj"]
+      )
       
     }
     else {
       
-      lst <- data.frame(ID = lst)
+      lst <- data.frame(ID = lst, 
+                        `log2FoldChange` = lst1[lst, "log2FoldChange"], 
+                        `pvalue` = lst2[lst, "pvalue"],
+                        `padj` = lst2[lst, "padj"]
+      )
       
     }
     

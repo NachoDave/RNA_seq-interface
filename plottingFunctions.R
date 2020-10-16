@@ -71,7 +71,7 @@ volplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   # df$`p < 0.05`[is.na(df$`p < 0.05`)] = FALSE
   df$log10P <- -log10(df$padj)
   plt <- ggplot(df,aes(x = log2FoldChange, y = log10P, colour = upDwn , text = paste("Gene:", gsub("\\.\\d+", "", rownames(df))))) +
-    geom_point(size = 0.35) + ylab("-log10(P adjusted)") + xlab("log fold change") + 
+    geom_point(size = 0.25) + ylab("-log10(P adjusted)") + xlab("log fold change") + 
     #theme(legend.position = "none") + #geom_hline(yintercept = 0, linetype = "dashed") + 
     ggtitle(paste0(gsub("log2\ fold\ change\ \\(.+\\):\ ", "", DEseqRes[[1]]@elementMetadata$description[[2]]), tit)) + 
     scale_color_manual(values = c("blue", "gray", "red"), name = "Up/down Regulated") 
