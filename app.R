@@ -432,7 +432,7 @@ ui <- fluidPage(
                                                            
                                                   fluidRow(h3("Gene List")),
                                                   fluidRow(DT::dataTableOutput("ovrLpGnTab")),
-                                                  fluidRow(plotOutput("ovrLpGnPlt")),
+                                                  fluidRow(plotlyOutput("ovrLpGnPlt")),
                                                   #    helpText("To filter the based on values type string 'lower Value ... Upper Value' into
                                                   # filter boxes after table, i.e to filter p value between 0 and 0.05 type 0 ... 0.5 into the p value filter")
                                      ),
@@ -1609,8 +1609,8 @@ server <- function(input, output, session) {
       #gnTbDT <- #formatRound(datatable(reVals$curGeneTab), digits = 5, 
                  #           columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])      
       
-      # absFc <- abs(reVals$curGeneTab$log2FoldChange)
-      # reVals$curGeneTab$'abs log2FoldChange' <- absFc
+      absFc <- abs(reVals$curGeneTab$log2FoldChange)
+      reVals$curGeneTab$'abs log2FoldChange' <- absFc
       #browser()
       #reVals$curGeneTab <- reVals$curGeneTab[, c(1, 2,3, 5, 6)]
       gnTbDT <- reVals$curGeneTab
@@ -1684,7 +1684,7 @@ server <- function(input, output, session) {
        ### ================================================================================================================ ###   
         # Run the compare gene lists
        observeEvent(input$cmpGeneList, {
-         browser()
+         #browser()
          if (input$cmpGeneList1 == "" | input$cmpGeneList2 == ""){
            showModal(modalDialog(title = "Warning", "No Gene lists to compare"))
          } else {
@@ -1701,21 +1701,21 @@ server <- function(input, output, session) {
          elementN2 <- nrow(reVals$analysisOb@GeneTables[[input$cmpGeneList2]]@gnTbl)
          ovlpN <- nrow(tGnOvlpTb)
          ## Plot results
-         
+
          if (input$cmpGeneListOp == "In both"){
          fig <- pltVenn(input$cmpGeneList1, input$cmpGeneList2, c(elementN1 - ovlpN, ovlpN, elementN2 - ovlpN))
-         output$ovrLpGnPlt <- renderPlot(fig)
+         output$ovrLpGnPlt <- renderPlotly(fig)
          } else if(input$cmpGeneListOp == "In list 1 not 2"){
-           
+
            fig <- pltVenn(input$cmpGeneList1, input$cmpGeneList2, c(ovlpN, elementN1 - ovlpN, elementN2 - (elementN1 - ovlpN)))
-           output$ovrLpGnPlt <- renderPlot(fig)            
-           
-           
+           output$ovrLpGnPlt <- renderPlotly(fig)
+
+
          } else {
            fig <- pltVenn(input$cmpGeneList1, input$cmpGeneList2, c(elementN1 - (elementN2 - ovlpN), elementN2 - ovlpN, ovlpN))
-           output$ovrLpGnPlt <- renderPlot(fig)             
-           
-           
+           output$ovrLpGnPlt <- renderPlotly(fig)
+
+
          }
        })
        
