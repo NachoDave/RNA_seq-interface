@@ -523,7 +523,10 @@ server <- function(input, output, session) {
                              maFig = ggplotly(), volFig = ggplotly(), 
                              curGeneTab = data.frame(), 
                              gnCmp = data.frame(),
-                             qcHtml = data.frame()
+                             qcHtml = data.frame(),
+                             facEditable = "cell",
+                             createExpTab = FALSE
+                             
                              )
     
     
@@ -548,7 +551,7 @@ server <- function(input, output, session) {
     # Load a previous analysis
     observeEvent(input$loadAnalysis, {
         req(input$loadAnalysis$datapath)
-        print(input$loadAnalysis$name)
+        #print(input$loadAnalysis$name)
 
         # Import the rdata object and assign the analysis object to analysisOb
         #browser()
@@ -628,11 +631,27 @@ server <- function(input, output, session) {
                      
                      #browser()
                      if ( is.null(input$loadAnalysis)) return(NULL)
+                   
+                    # if (){
+                    #   
+                    #   
+                    #   return(NULL)
+                    # }
+                   
                      inFile <- input$loadAnalysis
                      file <- inFile$datapath
                      # load the file into new environment and get it from there
                      e = new.env()
-                     name <- load(file, envir = e)
+                     err <- try(name <- load(file, envir = e))
+                     
+                     if (class(err) == "try-error"){
+                       
+                       showModal(modalDialog(title = "Warning", "This file is not an rdata file. Have you tried to load a gene count table into the load workspace bar?"))
+                       
+                       return()
+                       
+                     }
+                     
                      reVals$analysisOb <- e[[name]]
                      
                      #browser()
@@ -691,8 +710,16 @@ server <- function(input, output, session) {
                        gnTbDT <- reVals$curGeneTab
                        gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
 
+                       
+                       if (input$convertGeneIDtoSym == "Ensembl"){
+                         nmRows = F
+                       } else
+                       {
+                         nmRows = T
+                       }
+                       
                        output$geneListDT <- DT::renderDataTable(gnTbDT
-                                                                , server = TRUE,  rownames = T)
+                                                                , server = TRUE,  rownames = nmRows)
                        updateSelectInput(session, "cmpGeneList1", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
                        updateSelectInput(session, "cmpGeneList2", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
                      }
@@ -703,7 +730,10 @@ server <- function(input, output, session) {
                        tMet <- names(reVals$analysisOb@PthWyAnl)
                      updateSelectInput(session, inputId = "selectPthWy", 
                                        choices = tMet)}
-                       
+                   
+                     # set the facEditable to none
+                     reVals$facEditable <- "none"
+                         
                  })
     
     # Modal dialog box for writing a description ------------------------------------------------- #
@@ -774,7 +804,7 @@ server <- function(input, output, session) {
     
     ### Factor table ----------------------------------------------------------------------------------------------- ###
     
-    output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = "cell")
+    output$factors = DT::renderDataTable(reVals$factorsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', editable = reVals$facEditable)
     
     # Add new factor
     observeEvent(input$addFactor, {
@@ -819,7 +849,7 @@ server <- function(input, output, session) {
         print(reVals$analysisOb)
         updateSelectInput(session, "selectFacTab", choices = as.character(1:length(reVals$analysisOb@factorsTab)), selected =
                               length(reVals$analysisOb@factorsTab) )
-        
+        reVals$facEditable <- "none"
 
     })
     
@@ -830,6 +860,7 @@ server <- function(input, output, session) {
         reVals$curFacTabDx <- as.numeric(input$selectFacTab)
         reVals$factorsTab <- reVals$analysisOb@factorsTab[[reVals$curFacTabDx]]
         reVals$analysisOb@State["factorsTab", "selected"] <- input$selectFacTab
+        reVals$facEditable <- "none"
         }
         #print(reVals$factorsTab)
 
@@ -841,6 +872,7 @@ server <- function(input, output, session) {
         #browser()
         reVals$curFacTabDx <- length(reVals$analysisOb@factorsTab) + 1
         reVals$factorsTab = tibble(Factors = "", Level1 = "", Level2 = "")
+        reVals$facEditable <- "cell"
 
     })
     
@@ -961,6 +993,7 @@ server <- function(input, output, session) {
         return()
       } 
       
+      reVals$createExpTab <- TRUE
       newTabNm <- input$nameExpSamTab # the name of the new sample table
       curTabNm <- input$selectExpSmp # current sample table
       
@@ -1038,6 +1071,14 @@ server <- function(input, output, session) {
       #   
       # }
       # }
+      
+      if (!reVals$createExpTab){
+        
+        showModal(modalDialog(title = "Warning", "Please create new Experiment sample table before adding to workspace"))
+        return()
+        
+      }
+      
       if (any(class(reVals$assignFactorsTab) == "shiny.render.function")){
         
         showModal(modalDialog(title = "Warning", "Please create new Experiment sample table before adding to workspace"))
@@ -1064,6 +1105,7 @@ server <- function(input, output, session) {
         
         # Update dropdown
         updateSelectInput(session, "selectExpSmp", choices = names(reVals$analysisOb@ExpSmpTab), selected = input$nameExpSamTab)
+        reVals$createExpTab <- FALSE
         
       }
       
@@ -1307,7 +1349,7 @@ server <- function(input, output, session) {
     
     # Run DESeq
     observeEvent(input$runDESeq2, {
-    
+      browser()
       if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
         #browser()
         nt <- showNotification("DESeq2 Running", duration = NULL)
@@ -1535,7 +1577,17 @@ server <- function(input, output, session) {
     # Update the select diff analysis drop down
     observeEvent(reVals$analysisOb@NrmCnts, 
                  {
-                   updateSelectInput(session, "selectDiffAnl", choices = names(reVals$analysisOb@NrmCnts))
+                   #browser()
+                   if (input$selectDiffAnl == ""){
+                     updateSelectInput(session, "selectDiffAnl", choices = names(reVals$analysisOb@NrmCnts))
+                     
+                   }
+                   else {
+                      x<- input$selectDiffAnl
+                     updateSelectInput(session, "selectDiffAnl", choices = names(reVals$analysisOb@NrmCnts), selected = x)
+                     
+                   }
+                   
                    
                  })
     
@@ -1600,8 +1652,16 @@ server <- function(input, output, session) {
 
         showModal(modalDialog(title = "warning", "No DESeq results found. Have you run 'Get DESeq2 Results' in the differential Analysis tab?"))
         reVals$curGeneTab <- data.frame("")
+        
+        if (input$convertGeneIDtoSym == "Ensembl"){
+          nmRows = F
+        } else
+        {
+          nmRows = T
+        }
+        
         output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
-                                                 , server = TRUE,  rownames = T, filter = 'top')
+                                                 , server = TRUE,  rownames = nmRows, filter = 'top')
         return()
       }
       #reVals$curGeneTab$Abs
@@ -1616,8 +1676,15 @@ server <- function(input, output, session) {
       gnTbDT <- reVals$curGeneTab
       gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
       
+      if (input$convertGeneIDtoSym == "Ensembl"){
+        nmRows = F
+      } else
+      {
+        nmRows = T
+      }
+      
       output$geneListDT <- DT::renderDataTable(gnTbDT
-                                               , server = TRUE,  rownames = T, filter = 'top')
+                                               , server = TRUE,  rownames = nmRows, filter = 'top')
     })
     
     
@@ -1665,7 +1732,15 @@ server <- function(input, output, session) {
       gnTbDT <- reVals$curGeneTab
       gnTbDT[sapply(reVals$curGeneTab, is.numeric)] <- round(reVals$curGeneTab[sapply(reVals$curGeneTab, is.numeric)], 5)
       
-      output$geneListDT <- DT::renderDataTable(gnTbDT, server = TRUE,  rownames = T)
+      #browser()
+      if (input$convertGeneIDtoSym == "Ensembl"){
+        nmRows = F
+      } else
+      {
+        nmRows = T
+      }
+      
+      output$geneListDT <- DT::renderDataTable(gnTbDT, server = TRUE,  rownames = nmRows)
       }
       
     })
