@@ -4,6 +4,7 @@ library(plotly)
 library("pheatmap")
 library("RColorBrewer")
 library(ggforce)
+library(heatmaply)
 
 maplot <- function(DEseqRes, tit = "", xlims = NULL, ylims = NULL){
   #browser()
@@ -181,11 +182,30 @@ pltSmpDist <- function(cntMat, trnsFrm){
   sampleDistMatrix <- as.matrix(dst)
   rownames(sampleDistMatrix) <- colnames(cntMat@dds)
   colnames(sampleDistMatrix) <- colnames(cntMat@dds)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-  fig <- pheatmap(sampleDistMatrix,
-           clustering_distance_rows=dst,
-           clustering_distance_cols=dst,
-           col=colors)
+ # browser()
+ fig <- heatmaply(sampleDistMatrix, colors = rev(Blues(100)), grid_color = "black") %>% config(displaylogo = FALSE,
+                                               modeBarButtonsToRemove = list(
+                                                 'sendDataToCloud',
+                                                 'pan2d',
+                                                 'autoScale2d',
+                                                 #'resetScale2d',
+                                                 'hoverClosestCartesian',
+                                                 'hoverCompareCartesian', 
+                                                 'select2d',
+                                                 'lasso2d',
+                                                 'drawline',
+                                                 'toggleSpikelines ',
+                                                 'zoomIn2d',
+                                                 'zoomOut2d',
+                                                 'toggleSpikelines'
+                                               )) 
+  # colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  # fig <- pheatmap(sampleDistMatrix,
+  #          clustering_distance_rows=dst,
+  #          clustering_distance_cols=dst,
+  #          col=colors)
+ #browser()
+
   
   return(fig)
   
@@ -209,8 +229,22 @@ pltHtMp <- function(cntMat, trnsFrm){
   select <- order(rowMeans(counts(cntMat@dds,normalized=TRUE)),
                   decreasing=TRUE)[1:20]
   df <- as.data.frame(colData(cntMat@dds)[,names(colData(cntMat@dds))[3: length(names(colData(cntMat@dds)))- 1]])
-  fig <- pheatmap(assay(trnDt)[select,], cluster_rows=FALSE, show_rownames=FALSE,
-           cluster_cols=FALSE, annotation_col=df)
+  fig <- heatmaply(assay(trnDt)[select,], Rowv = FALSE, Colv = FALSE, grid_color = "black", colors = heat.colors(100))  %>% config(displaylogo = FALSE,
+                                                                                  modeBarButtonsToRemove = list(
+                                                                                    'sendDataToCloud',
+                                                                                    'pan2d',
+                                                                                    'autoScale2d',
+                                                                                    #'resetScale2d',
+                                                                                    'hoverClosestCartesian',
+                                                                                    'hoverCompareCartesian', 
+                                                                                    'select2d',
+                                                                                    'lasso2d',
+                                                                                    'drawline',
+                                                                                    'toggleSpikelines ',
+                                                                                    'zoomIn2d',
+                                                                                    'zoomOut2d',
+                                                                                    'toggleSpikelines'
+                                                                                  )) 
   
   return(fig)
 }

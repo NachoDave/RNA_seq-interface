@@ -78,12 +78,12 @@ ui <- fluidPage(
                               # table showing count data
                               fluidRow(h4("Loaded Gene Count tables")),
                               #fluidRow(DTOutput("genCntTbl")),
-                              fluidRow(
+                              #fluidRow(
                                 
                                 
                                 DT::dataTableOutput('genCntTabTab'),
                                 #verbatimTextOutput('y12')
-                              ),
+                              #),
                               fluidRow(actionButton("removeGnCnt", "Remove Gene Counts")),
                               #fluidRow(h4('Factors tables'), DT::dataTableOutput('ldedGnFacsTab')),
                               
@@ -243,7 +243,17 @@ ui <- fluidPage(
                             
                             #fluidRow(,
                             
-                            
+                            sidebarLayout(
+                              sidebarPanel(width = 12, id = "DESeqRun",
+                                           
+                                           fluidRow(h3("Gene Counts"),
+                                                    (radioButtons("nrmedCntDisp", "Show counts", choices = c("Raw", "Normed"), selected = "Normed", inline = TRUE)),
+                                                    DT::dataTableOutput("cntsDT")),
+
+                                           
+                              ),
+                              mainPanel(width = 0)
+                            ),                       
                             
                             
                             ),                        
@@ -268,14 +278,14 @@ ui <- fluidPage(
                           h3("PCA"),
                           fluidRow(plotlyOutput("PCAPlt")),
                           h3("Sample Distance"),
-                          fluidRow(plotOutput("smpDstPlt")),
+                          fluidRow(plotlyOutput("smpDstPlt")),
                           
                    ),
                    
                    column(5, 
                           
                           h3("Heat Map of Count Matrix"),
-                          fluidRow(plotOutput("GnCntPlt")),
+                          fluidRow(plotlyOutput("GnCntPlt")),
                           
                    )
                    ),
@@ -301,7 +311,7 @@ ui <- fluidPage(
                           sidebarLayout(
                             sidebarPanel(width = 12, id = "DESeqGetRes",
                               fluidRow(actionButton(label = "Get DESeq2 results", inputId = "deseqResAct"), 
-                                       checkboxInput(label = "Calculate LFC", inputId = "LFCSelect"),
+                                       checkboxInput(label = "Calculate LFC Shrinkage", inputId = "LFCSelect"),
                                        selectInput(label = "Select LFC Method", inputId = "LFCMethod", choices = c("apeglm", "ashr", "normal"))
                                        ),
                           
@@ -314,7 +324,7 @@ ui <- fluidPage(
                               sidebarPanel(width = 12, id = "DESeqGetRes", 
                                 fluidRow(actionButton(label = "MA Plot", inputId = "plotMAAct")), 
                                 fluidRow(actionButton(label = "Volcano Plot", inputId = "plotVolcanoAct")),
-                                checkboxInput(label = "Plot LFC Result?", inputId = "plotLFCChk")
+                                checkboxInput(label = "Plot LFC Shrinkage Result?", inputId = "plotLFCChk")
                               ), 
                               mainPanel(width = 0)
                           )
@@ -349,7 +359,7 @@ ui <- fluidPage(
                         sidebarPanel(width = 12, id = "DESeqRun",
                                      fluidRow(h3("Create Gene list from Differential Analysis")),
                           fluidRow(selectInput(label = "1. Select Differential Analysis", inputId = "selectDiffAnl", choices = NULL)),
-                          fluidRow(checkboxInput(label = "Use LFC", inputId = "LFCGeneList")),
+                          fluidRow(checkboxInput(label = "Use LFC Shrinkage", inputId = "LFCGeneList")),
                           fluidRow(radioButtons(inputId = "convertGeneIDtoSym", label = "2. Convert Gene IDs to symbols?", choices = c("No", "Ensembl", "Entrez"), selected = "Ensembl")),
                           fluidRow(h5(strong("3. Create New Gene List"))),
                           fluidRow(actionButton(label = "Create Gene List",inputId =  "createGeneList")), 
@@ -661,7 +671,7 @@ server <- function(input, output, session) {
                      # Recreate the tables etc
                      # Gene counts table table
                      #output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
-                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE)
+                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta[, 1:2], server = FALSE)
                      
                      # Factors tables and drp downs
                      #browser()
@@ -788,7 +798,7 @@ server <- function(input, output, session) {
         removeModal()
 
         # Update the gene counts table
-        output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE)
+        output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta[, 1:2], server = FALSE)
         #output$y12 = renderPrint(input$genCntTabTab_rows_selected)
         
     })
@@ -1190,7 +1200,7 @@ server <- function(input, output, session) {
 ## Normalization tab ============================================================================================== ###
      # Set the select experimental sample table, set to be same as the one on the factors page
    # browser()
-   output$nrmCntsDT = DT::renderDataTable(reVals$nrmedCntsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe')
+   output$nrmCntsDT = DT::renderDataTable(reVals$nrmedCntsTab, server = FALSE, options = list(dom = 't'), rownames = F, class = 'cell-border stripe', selection = "single")
     observeEvent(input$selectExpSmp, {
       
       #browser()
@@ -1265,26 +1275,89 @@ server <- function(input, output, session) {
       
     })
     
+    # Choose the gene counts table to displ
+    
+   # observeEvent(input$nrmedCntDisp, {
+      
+    #  browser()
+      
+    #})
+    
+    observeEvent(input$nrmCntsDT_rows_selected,{
+      
+     # browser()
+      nrmCntOb <- as.character(reVals$nrmedCntsTab[input$nrmCntsDT_rows_selected, 1])
+      
+      if (input$nrmedCntDisp == "Raw"){
+        
+        n <- FALSE
+        
+      } else
+      {
+        
+        n <- TRUE
+      }
+      
+      rndTb <- as.data.frame(counts(reVals$analysisOb@NrmCnts[[nrmCntOb]]@dds, normalized = n))
+      #browser()
+      if (grep("ENSG", rownames(rndTb)[1])){
+      
+      ensId <- gsub("\\.\\d+", "",rownames(rndTb))
+      gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
+      rndTb$`Gene Symbol` <- ""
+      rndTb <- rndTb[ , c(ncol(rndTb), 1:ncol(rndTb) - 1)]
+      rndTb$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
+      
+      }
+      
+      output$cntsDT <- DT::renderDataTable(rndTb
+                                           , server = TRUE, filter = 'top' )
+    })
+    
     ## Data Exploration tab ========================================================================================== ###
     # plot distance heat map
     observeEvent(input$smpDist, {
       #browser()
+      if (length(reVals$analysisOb@NrmCnts) == 0){
+        
+        showModal(modalDialog(title = "Warning", "No Normalized objects created yet. Normalize your counts"))
+        
+        return()
+        
+      }
+      
       nt <- showNotification("Making Distance heatmap", duration = NULL)
       fig <- pltSmpDist(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
-      output$smpDstPlt <- renderPlot(fig)
+      output$smpDstPlt <- renderPlotly(fig)
       removeNotification(nt)
     })
     
     # plot count heat map
     observeEvent(input$htMp, {
+      
+      if (length(reVals$analysisOb@NrmCnts) == 0){
+        
+        showModal(modalDialog(title = "Warning", "No Normalized objects created yet. Normalize your counts"))
+        
+        return()
+        
+      }
       nt <- showNotification("Making Count Matrix Heatmap", duration = NULL)
       fig <- pltHtMp(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
-      output$GnCntPlt <- renderPlot(fig)
+      output$GnCntPlt <- renderPlotly(fig)
       removeNotification(nt)
     })
     
     # PCA plot
     observeEvent(input$pca, {
+      #browser()
+      if (length(reVals$analysisOb@NrmCnts) == 0){
+        
+        showModal(modalDialog(title = "Warning", "No Normalized objects created yet. Normalize your counts"))
+        
+        return()
+        
+      }
       nt <- showNotification("Making PCA plot", duration = NULL)
       fig <- pltPCA(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
       output$PCAPlt <- renderPlotly(fig)
@@ -1349,7 +1422,7 @@ server <- function(input, output, session) {
     
     # Run DESeq
     observeEvent(input$runDESeq2, {
-      browser()
+      #browser()
       if(length(reVals$analysisOb@NrmCntsExpSmp) > 0){
         #browser()
         nt <- showNotification("DESeq2 Running", duration = NULL)
