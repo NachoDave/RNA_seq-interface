@@ -249,7 +249,7 @@ pltHtMp <- function(cntMat, trnsFrm){
   return(fig)
 }
 
-pltPCA <- function(cntMat, trnsFrm){
+pltPCA <- function(cntMat, trnsFrm, color = "None", shape = "None"){
   
   if (trnsFrm == "vst"){
     trnDt <- vst(cntMat@dds, blind = F)
@@ -263,9 +263,19 @@ pltPCA <- function(cntMat, trnsFrm){
     
   }
   #browser()
+  
+  if (color == "None" & shape == "None"){
+    
+    color = name
+    
+  }
+  
+  if (color == "None"){color = NULL}
+  if (shape == "None"){shape = NULL}
+  
   pcaDt <- plotPCA(trnDt, intgroup=c(names(colData(cntMat@dds))[3: length(names(colData(cntMat@dds)))- 1]), returnData=TRUE)
   percentVar <- round(100 * attr(pcaDt, "percentVar"))
-  p <- ggplot(pcaDt, aes(x = PC1, y = PC2, color = name)) +
+  p <- ggplot(pcaDt, aes_string(x = "PC1", y = "PC2", color = color, shape = shape)) +
     geom_point(size=3) + 
     xlab(paste0("PC1: ",percentVar[1],"% variance")) +
     ylab(paste0("PC2: ",percentVar[2],"% variance")) 

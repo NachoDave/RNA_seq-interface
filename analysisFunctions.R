@@ -25,6 +25,8 @@ deseq2CntNrm <- function(ob, expSmpNm, designFacs, ddsNm, rmCnt = 10, selCol = 2
      
    } else
    {
+     #browser()
+     print(dx)
      gnCntMat$x <- tGnCnt[, selCol]
      
    }

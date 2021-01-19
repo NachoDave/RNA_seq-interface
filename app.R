@@ -20,7 +20,7 @@ source("nrmCntResults.R")
 source("plottingFunctions.R")
 source("geneTable.R")
 source("pathWaySave.R")
-options(shiny.maxRequestSize =200*1024^2)
+options(shiny.maxRequestSize =1000*1024^2)
 library(EnsDb.Hsapiens.v86)
 library(WebGestaltR)
 library(apeglm)
@@ -268,6 +268,9 @@ ui <- fluidPage(
                                                                       fluidRow(actionButton(label = "Sample Distance",inputId =  "smpDist")),
                                                                       fluidRow(actionButton(label = "Heat Map",inputId =  "htMp")),
                                                                       
+                                                                      fluidRow(h2("Plot Grouping Options")),
+                                                                      fluidRow(selectInput(label = "Select colour grouping", inputId = "selectColor", choices = NULL)),
+                                                                      fluidRow(selectInput(label = "Select shape grouping", inputId = "selectShape", choices = NULL))
                                                          ),
                                                          mainPanel(width = 0)
                                                          
@@ -349,6 +352,8 @@ ui <- fluidPage(
                           
                    
                    ),
+                   ## Gene tables ======================================================================================== ##
+                   
                    tabPanel("Genelists/Sequences",
                       column(3,
                         
@@ -671,7 +676,8 @@ server <- function(input, output, session) {
                      # Recreate the tables etc
                      # Gene counts table table
                      #output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta, server = FALSE, options = list(dom = 't'))
-                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta[, 1:2], server = FALSE)
+                     output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta[, 1:2], server = FALSE,
+                                                               )
                      
                      # Factors tables and drp downs
                      #browser()
@@ -729,7 +735,14 @@ server <- function(input, output, session) {
                        }
                        
                        output$geneListDT <- DT::renderDataTable(gnTbDT
-                                                                , server = TRUE,  rownames = nmRows)
+                                                                , server = TRUE,  rownames = nmRows, 
+                                                                options=list(lengthMenu=c(5,10,25,50,100),
+                                                                             pageLength=25,
+                                                                             searchHighlight=TRUE,
+                                                                             autoWidth=TRUE,
+                                                                             columnDefs=list(list(width="500px",targets="_all"), 
+                                                                                             scrollX = TRUE)
+                                                                ))
                        updateSelectInput(session, "cmpGeneList1", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
                        updateSelectInput(session, "cmpGeneList2", choices = names(reVals$analysisOb@GeneTables), selected =  names(reVals$analysisOb@GeneTables)[[1]])
                      }
@@ -766,9 +779,12 @@ server <- function(input, output, session) {
     # Load new datasets --------------------------------------------------------------------------- #
     # Load gene count tables
     observeEvent(input$loadCntTab, {
+      
         #print(reVals$analysisOb)
         #print(input$loadCntTab$name)
         reVals$geneCntIn <- read.csv(input$loadCntTab$datapath, skip = 3, sep = "\t")
+        
+        
          # check if the data has 4 columns
         if (ncol(reVals$geneCntIn) != 4){
           
@@ -790,13 +806,17 @@ server <- function(input, output, session) {
         reVals$geneSetDes <- input$description
         
         # Write gene count table and meta data to analysisOb
+        
+        
         #browser()
         reVals$analysisOb <- newGeneCnts(isolate(reVals$analysisOb), reVals$geneCntIn, data.frame(Description = reVals$geneSetDes, FileName = input$loadCntTab$name, stringsAsFactors = F))
         reVals$geneSetDes <- "" # reset the description
         reVals$geneCntIn <- NULL
-        print(reVals$analysisOb)
         removeModal()
-
+        
+        print(length(reVals$analysisOb@GeneCntTables))
+        print(reVals$analysisOb@GeneMeta)
+        
         # Update the gene counts table
         output$genCntTabTab = DT::renderDataTable(reVals$analysisOb@GeneMeta[, 1:2], server = FALSE)
         #output$y12 = renderPrint(input$genCntTabTab_rows_selected)
@@ -1111,6 +1131,7 @@ server <- function(input, output, session) {
             else{
         
         # write table to analysis object
+            #  browser()
         reVals$analysisOb <- addExpSmpTab(reVals$analysisOb, curExpSmpVals, input$nameExpSamTab, as.numeric(input$selectFacTab))
         
         # Update dropdown
@@ -1311,7 +1332,7 @@ server <- function(input, output, session) {
       }
       
       output$cntsDT <- DT::renderDataTable(rndTb
-                                           , server = TRUE, filter = 'top' )
+                                           , server = TRUE, filter = 'top', options = list(scrollX = TRUE))
     })
     
     ## Data Exploration tab ========================================================================================== ###
@@ -1359,10 +1380,23 @@ server <- function(input, output, session) {
         
       }
       nt <- showNotification("Making PCA plot", duration = NULL)
-      fig <- pltPCA(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn)
+      fig <- pltPCA(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]], input$expDtTrn, color = input$selectColor, shape = input$selectShape)
       output$PCAPlt <- renderPlotly(fig)
       removeNotification(nt)      
       
+      
+    })
+    
+    observeEvent(input$selectNrmCntsExp, {
+      if ((!input$selectNrmCntsExp == "")){
+        # Update the select colour menu
+        updateSelectInput(session, "selectColor", 
+                          choices = c("None", names(colData(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]]@dds))[3: length(names(colData(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]]@dds)))- 1], "name"), selected = "None")
+      
+      # Update the select shape menu
+      updateSelectInput(session, "selectShape", 
+                        choices = c("None", names(colData(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]]@dds))[3: length(names(colData(reVals$analysisOb@NrmCnts[[input$selectNrmCntsExp]]@dds)))- 1], "name"), selected = "None")}
+      #browser()
       
     })
     
@@ -1678,10 +1712,15 @@ server <- function(input, output, session) {
           
           ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
           rownames(reVals$curGeneTab) <- ensId
-          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
+          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL", "GENEBIOTYPE"))
           reVals$curGeneTab$`Gene Symbol` <- ""
           reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
           reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
+          
+          reVals$curGeneTab$biotype <- ""
+          reVals$curGeneTab$biotype[ensId %in% gnSym$GENEID] <- gnSym$GENEBIOTYPE
+          browser()
+          
           
           # Make a datatable object for rendering and reducing column width
           # gnTbDT <- formatRound(datatable(reVals$curGeneTab), digits = 5, 
@@ -1703,11 +1742,12 @@ server <- function(input, output, session) {
           
           ensId <- gsub("\\.\\d+", "",rownames(reVals$curGeneTab))
           rownames(reVals$curGeneTab) <- ensId
-          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL"))
+          gnSym <- ensembldb::select(EnsDb.Hsapiens.v86, keys = ensId, keytype = "GENEID", columns = c("SYMBOL", "GENEBIOTYPE"))
           reVals$curGeneTab$`Gene Symbol` <- ""
           reVals$curGeneTab <- reVals$curGeneTab[ , c(ncol(reVals$curGeneTab), 1:ncol(reVals$curGeneTab) - 1)]
           reVals$curGeneTab$`Gene Symbol`[ensId %in% gnSym$GENEID] <- gnSym$SYMBOL
-
+          reVals$curGeneTab$biotype <- ""
+          reVals$curGeneTab$biotype[ensId %in% gnSym$GENEID] <- gnSym$GENEBIOTYPE
           # Make a datatable object for rendering and reducing column width
           # gnTbDT <- formatRound(datatable(reVals$curGeneTab), digits = 5, 
           #                       columns = colnames(reVals$curGeneTab)[sapply(reVals$curGeneTab, is.numeric)])
@@ -1734,7 +1774,14 @@ server <- function(input, output, session) {
         }
         
         output$geneListDT <- DT::renderDataTable(reVals$curGeneTab
-                                                 , server = TRUE,  rownames = nmRows, filter = 'top')
+                                                 , server = TRUE,  rownames = nmRows, filter = 'top', 
+                                                 options=list(lengthMenu=c(5,10,25,50,100),
+                                                              pageLength=10,
+                                                              searchHighlight=TRUE,
+                                                              autoWidth=TRUE,
+                                                              columnDefs=list(list(width="100px",targets="_all")), 
+                                                              scrollX = TRUE
+                                                 ))
         return()
       }
       #reVals$curGeneTab$Abs
@@ -1757,7 +1804,14 @@ server <- function(input, output, session) {
       }
       
       output$geneListDT <- DT::renderDataTable(gnTbDT
-                                               , server = TRUE,  rownames = nmRows, filter = 'top')
+                                               , server = TRUE,  rownames = nmRows, filter = 'top', 
+                                               options=list(lengthMenu=c(5,10,25,50,100),
+                                                            pageLength=10,
+                                                            searchHighlight=TRUE,
+                                                            autoWidth=TRUE,
+                                                            columnDefs=list(list(width="100px",targets="_all")), 
+                                                            scrollX = TRUE
+                                               ))
     })
     
     
@@ -1813,7 +1867,13 @@ server <- function(input, output, session) {
         nmRows = T
       }
       
-      output$geneListDT <- DT::renderDataTable(gnTbDT, server = TRUE,  rownames = nmRows)
+      output$geneListDT <- DT::renderDataTable(gnTbDT, server = TRUE,  rownames = nmRows, options=list(lengthMenu=c(5,10,25,50,100),
+                                                                                                       pageLength=10,
+                                                                                                       searchHighlight=TRUE,
+                                                                                                       autoWidth=TRUE,
+                                                                                                       columnDefs=list(list(width="100px",targets="_all")), 
+                                                                                                       scrollX = TRUE
+      ))
       }
       
     })
